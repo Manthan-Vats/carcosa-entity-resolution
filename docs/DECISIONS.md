@@ -12,9 +12,12 @@ Rule: nothing is built on a PROPOSED item.
 | D-05 | First milestone | Simple end-to-end baseline (TF-IDF blocking → rapidfuzz features → LightGBM → threshold) → validated first submission, then iterate | research/01 | AGREED |
 | D-06 | Model license scope | Treat the MIT/Apache + ≤8B rule as applying to EVERY model in the pipeline | PS constraint 5 | AGREED |
 | D-07 | Library licenses | Prefer permissive libs (anyascii over GPL Unidecode; skip LGPL deepparse, libpostal) | research/01 | AGREED |
-| D-08 | Grey areas | Hand-written abbreviation/suffix lists allowed + documented; unlabeled test text may be used to fit TF-IDF/IDF vocab (transductive, no labels), documented | PS_ANALYSIS §5 | AGREED |
+| D-08 | Grey areas | Hand-written abbreviation/suffix lists allowed + documented; unlabeled test text may be used to fit TF-IDF/IDF vocab (transductive, no labels), documented | PS_ANALYSIS §5 | REVISIT (research/05: IDF fitting must mirror test-time procedure inside validation) |
 | D-09 | rtk | Installed rtk 0.48.0 via winget; `rtk init -g` NOT run (global hook on Windows unverified) | research/03 | DONE |
 | D-10 | Soup CLI | MAYBE, later-stage only (LLM re-judge of borderline pairs); not the core | research/04 | AGREED |
 | D-11 | Devanagari handling | Learn a Devanagari→Latin token dictionary from train matches + anyascii/skeleton fallback; IndicXlit only if needed (Linux/Kaggle) | research/04, DATA_OVERVIEW | AGREED |
 | D-12 | Public repo | User checked: empty. Ignore. | user | CLOSED |
 | D-13 | Decision rule | Expected-F0.5 top-k (k≥0) per S1 from calibrated probabilities | research/01, 04 | AGREED |
+| D-14 | Lockbox + folds | 20% lockbox + 5×16% dev folds, split unit = S1 entity (proven equal to connected components: every S2/S3 id has ≤1 owner), stratified by country × match-count; unmatched S2/S3 distributed proportionally per country × source; seed 2026; `scripts/make_splits.py` → `data/splits/train_splits.parquet`; lockbox id sha256 prefix 24c6c88570ba216f. Lockbox rows are never inspected during EDA/rule writing. | GT structure analysis, research/05 | DONE |
+| D-15 | EDA tooling | Don't install the K-Dense EDA skill (512 MiB cap, hides raw values, built for scientific formats); adopt its reasoning rules + report template. Skip the networkx/polars skills. Candidates pandera + skrub TableReport, to be tested on a sample before use. | read the skill source | AGREED |
+| D-16 | Train/test pool ratio shift | Test pool/S1 ≈ 5.7 vs train 4.68 (all countries). Cause (more matches vs more distractors) is UNKNOWN; must be investigated before calibration/threshold design. | size analysis | OPEN |

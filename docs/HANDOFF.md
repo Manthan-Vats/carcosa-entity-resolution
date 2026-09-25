@@ -3,7 +3,7 @@
 _Last updated: 2026-09-25 (session 1)_
 
 ## Where we are
-**Phase 0 (setup) DONE. Next: Phase 1 EDA. The plan is waiting for a go-ahead.**
+**Phase 0 done. Data-understanding protocol agreed (research/05 + K-Dense reasoning rules). Step 0 (GT structure) and Step 1 (lockbox + folds, D-14) DONE. Next: Step 2 profiling on dev folds (test pandera + skrub first). Open: D-16 train/test pool ratio shift; France strategy (research later).**
 
 ## Done so far
 - PS transcribed → `docs/PROBLEM_STATEMENT.md`; analysis → `docs/PS_ANALYSIS.md`.
