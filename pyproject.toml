@@ -1,0 +1,23 @@
+[project]
+name = "business-entity-resolution"
+version = "0.1.0"
+description = "Team carcosa - Amazon ML Challenge 2026 business entity resolution"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "polars",
+    "pyarrow",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "rapidfuzz",
+    "jellyfish",
+    "anyascii",
+    "sparse-dot-topn",
+    "faiss-cpu",
+    "lightgbm",
+    "tqdm",
+    "pyyaml",
+]
+
+[dependency-groups]
+dev = ["ipykernel", "matplotlib"]
