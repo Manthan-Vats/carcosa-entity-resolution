@@ -247,3 +247,7 @@ Participants are **STRICTLY NOT ALLOWED** to use external databases, APIs, or se
 ## Portal Upload Panel
 
 - **Upload Matching Results File** — "Please upload the matching_results file in TSV format." → `upload file` → `Submit & Evaluate`
+
+## Update (portal, seen 2026-09-26): candidate_pairs.tsv is part of the final submission
+1. **Blocking has to scale.** Comparing every record with every other one is not an option; blocking must cut the search space to a small candidate set per Source 1 entity.
+2. **Candidate generation counts toward the final ranking.** `candidate_pairs.tsv` and the code producing it are reviewed alongside the `matching_results.tsv` score. The approach that generates a smaller candidate set per Source 1 entity is ranked higher in the final evaluation, beyond the public/private leaderboard.

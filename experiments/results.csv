@@ -1,1 +1,2 @@
 run_id	date	git_sha	stage	description	cv_scheme	f05	recall_ceiling	avg_candidates	notes
+r001	2026-09-26	c424767+	full	joint tfidf top15 + lgb prune + lgb pair model + exp-F0.5 topk	train f1-f3, es f4, score f0 (all dev S1 blocked vs dev pool)	0.9364	0.8881	4.27	US 0.9531 India 0.9113; block recall@15 0.8925; stage B hit 2000-round cap; PORTAL 0.902

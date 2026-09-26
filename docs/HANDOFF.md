@@ -1,33 +1,45 @@
 # HANDOFF — read this first each session
 
-_Last updated: 2026-09-25 (session 1)_
+_Last updated: 2026-09-26 (end of session 2)_
 
-## Where we are
-**Phase 0 done. Data-understanding protocol agreed (research/05 + K-Dense reasoning rules). Step 0 (GT structure) and Step 1 (lockbox + folds, D-14) DONE. Next: Step 2 profiling on dev folds (test pandera + skrub first). Open: D-16 train/test pool ratio shift; France strategy (research later).**
+## Goal now
+Leaderboard top is 0.9906 (many teams ~0.988). **Our first submission scored 0.902 on the portal** (dev f0 estimate was 0.936). Target: ≥0.99. Deadline ≈ 2026-09-28 00:00 IST (confirm on portal).
+Approach: research (papers, industry, white papers only — never other participants' repos), verify on dev, no guessing, then hand over files to upload.
 
-## Done so far
-- PS transcribed → `docs/PROBLEM_STATEMENT.md`; analysis → `docs/PS_ANALYSIS.md`.
-- Research (4 agents) → `docs/research/01..04_*.md`. Decisions D-01..D-13 → `docs/DECISIONS.md` (all AGREED/DONE/CLOSED).
-- Data overview → `docs/DATA_OVERVIEW.md`. Key numbers: train S1 2.21M / S2 5.03M / S3 5.29M; test S1 1.73M (US 663k, India 810k, France 259k) / S2 4.89M / S3 5.08M; 7.64M GT pairs; singletons 5.6%, most S1 have 2–5 matches.
-- Data extracted to `data/raw/student_resource/`; parquet cache in `data/interim/` (1.1 GB). Zip kept at root.
-- uv env (Py 3.12; polars 1.44.2, lightgbm 4.7.0, sparse_dot_topn 1.2.0, faiss-cpu 1.15.1, rapidfuzz, jellyfish, anyascii, sklearn). Torch and sentence-transformers are NOT installed in the venv yet (add when we reach the embedding stage; use the CUDA index).
-- `src/ber/{paths,io,metric}.py`; metric tests pass (`tests/test_metric.py`). `scripts/validate.sh` wraps the official validator. `experiments/results.csv` log header created.
-- rtk 0.48.0 installed (winget); `rtk init -g` not run.
-- git initialized (see `git log`).
+## State of the code (all under src/ber, scripts/)
+- `normalize.py`: anyascii + lowercase + `&`→and; **learned Indic→Latin token dictionary** (`data/interim/translit_dict.json`, built by `scripts/build_translit.py` from dev-fold matched pairs; 1,339 name tokens, 17 address tokens; 96.4% of test Indic name tokens covered); `num_sig()` house/plot-number signature (column `num_n`).
+- `data.py`: `records(split)` → cached `data/interim/{split}_records_norm.parquet` (name_n, addr_n, num_n). Caches were rebuilt with transliteration (num_n is added lazily on first load).
+- `blocking.py`: per-view TF-IDF (name char-3 max_df .005, addr word, num word), joint = hstack of sqrt(w)·views, `sp_matmul_topn`.
+- `pipeline.py` (v2, NOT yet run at full size): union of joint(0.3 name/0.7 addr)@30 + name-only@10 among empty-address pool + joint(0.3/0.5/0.2 num)@10 → cheap features (record stats, per-S1 and per-candidate context) → stage A LightGBM prune (keep 99.5% of blocked positives, cap 10) → full string features + **sibling (entity-centric) features** → stage B LightGBM → `decide.select` (expected-F0.5 top-k).
+- `scripts/run_dev.py` (all dev S1 blocked vs dev pool; train f1-f3, early-stop f4, report f0; saves `models/`), `scripts/run_test.py` (per-country scoring, writes `outputs/*.tsv`), `scripts/blocking_union.py` (recall experiments), `--smoke` flag for a fast check.
+- v1 artifacts archived in `data/interim/v1/` (models, block caches, the submitted TSVs).
 
-## Agreed pipeline (D-01)
-Normalize (anyascii, legal-form/abbr maps, learned Devanagari→Latin token dict) → blocking union (per-country char TF-IDF top-k via sparse_dot_topn + key blocks + later embeddings/FAISS) → LightGBM on pair features (rapidfuzz, TF-IDF cosine, rank, numbers/PIN) → [optional cross-encoder on top candidates] → per-S1 expected-F0.5 top-k (k≥0), 1:1 constraint if the data supports it. Validation: grouped by S1 + leave-one-country-out.
+## Results so far (experiments/results.csv)
+| run | what | dev f0 F0.5 | cands/S1 | cand recall | portal |
+|---|---|---|---|---|---|
+| r001 (v1) | joint@15, prune, LGB | 0.9364 (US .953, IN .911) | 4.27 | 0.888 | **0.902** |
+| v2 smoke | + empty/num views, translit, sibling feats not yet | 0.964 on smoke subset | 5.2 | 0.970 | – |
+v2 blocking recall on 5k f0 sample (before prune): US 0.960, India 0.910 (v1: 0.921 / 0.854).
 
-## Open questions
-1. Approve the Phase 1 EDA plan (see the last chat message / below).
-2. Turn on Windows Developer Mode (so the HF cache can use symlinks; saves disk)?
-3. Team work split among the 3 members.
+## Verified facts this session
+- Names repeat across many businesses (12.6% of US S1 names occur >20× in pool) → address must be in blocking.
+- v1 loss on f0: partial lists 0.041, empty prediction for non-singletons 0.020, singleton FP 0.003; oracle on v1 candidates 0.955 → blocking recall was the cap.
+- Missed pairs (v1): empty candidate address 38%, Indic script 25%, name-or-address changed 31%, both low 6%. Remaining India misses: near-identical text where only the house number discriminates.
+- Stage B probabilities are well calibrated; expected-F0.5 rule beat every global threshold and temperature on held-out halves of f0.
+- Splitting digit/letter boundaries ("302college") hurt recall (fused tokens are rare, discriminative) → not done.
+- Lower max_df speeds blocking but costs recall (0.002: US −6 pt) → keep 0.005.
 
-## Phase 1 EDA plan (proposed)
-1. One-owner check: can an S2/S3 record belong to more than one S1?
-2. Share of S2/S3 records that match no S1 at all (distractors).
-3. Do the countries of matched pairs agree? (Is blocking within a country safe?)
-4. Devanagari share by source × country; missing-field rates.
-5. Noise catalogue from ~300 sampled matched pairs per country (name + address noise types, S2 vs S3 differences).
-6. How hard is it: exact and near-exact match rates after simple normalization.
-7. A small France sample from test (unlabeled) to see which formats to expect.
+## Why portal (0.902) < dev (0.936) — to investigate FIRST next session
+1. **France** (15% of test S1, unseen in train): v1 predicted empty for 14.6% of French S1 vs 5.9% US → likely weak recall on France. Build a France proxy: leave-one-country-out (train US only → eval India, and vice versa) and inspect a random France sample of candidates (unlabeled) for normalisation gaps (Rue/R., Bd, Av., St-/Saint-, SARL/SAS/SA/EURL, accents, CEDEX, 5-digit postcodes).
+2. **Denser decoys in test (D-16)**: test has 23% more pool per S1, while predicted matches per S1 on test (US 3.3, IN 3.0) look similar to dev truth (3.46) → the extra pool is probably decoys [HYP]. Dev may overstate precision. Idea: make a denser dev evaluation (e.g., score f0 S1 against dev pool while holding out part of the dev S1 so their matches stay as decoys).
+3. Memory: 24 GB RAM; Background jobs get killed under memory pressure. Run one heavy job at a time; test scoring is per country.
+
+## Next steps (in order)
+1. Run `uv run python scripts/run_dev.py` (v2 incl. sibling features; ~1 h; blocking caches to `data/interim/dev_block.parquet`). Log to `logs/`, record in experiments/results.csv.
+2. France / transfer analysis (above) → normalisation fixes that are country-agnostic (never hard-code countries).
+3. `scripts/run_test.py` → `bash scripts/validate.sh` (+ `--check-ids`) → give user `outputs/matching_results.tsv` to upload.
+4. Further levers (docs/research/06_recall_levers.md): 1:1 owner constraint post-processing, second-hop retrieval from confident matches, stage B more rounds, char-level address view for typos.
+
+## Working agreement reminders
+- Lockbox never read. Research sources: papers/industry only.
+- Final zip later: `code/business_entity_resolution/` + `output/` + Documentation_template.md; candidate_pairs size matters for ranking (smaller is better).

@@ -6,3 +6,5 @@ models/
 __pycache__/
 *.parquet
 .ipynb_checkpoints/
+models_smoke/
+logs/
