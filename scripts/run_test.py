@@ -21,30 +21,26 @@ recs = records("test")
 stats = P.record_stats(recs)
 recs = recs.drop("business_name", "business_address")
 s1 = recs.filter(pl.col("src") == "1")
-blk_path = INTERIM / "test_block.parquet"
-if blk_path.exists():
-    blk = pl.read_parquet(blk_path)
-else:
-    blk = P.block(s1, recs.filter(pl.col("src") != "1"), cache=INTERIM / "test_block")
-    blk.write_parquet(blk_path)
-P.log(f"blocked pairs {blk.height}")
+# Blocking writes one cache file per country; scoring then loads one country at a time.
+countries = s1["country"].unique(maintain_order=True).to_list()
+blk_paths = {c: INTERIM / f"test_block_{c}.parquet" for c in countries}
+if not all(p.exists() for p in blk_paths.values()):
+    P.block(s1, recs.filter(pl.col("src") != "1"), cache=INTERIM / "test_block")
 
 
 def score(pairs: pl.DataFrame) -> pl.DataFrame:
     d = P.prune(P.cheap_features(pairs, stats), model_a, cfg["tau"], cfg["max_cands"])
+    P.log(f"pruned to {d.height} pairs")
     d = P.full_features(d, recs)
     d = d.with_columns(pl.Series("prob", P.predict(model_b, d, P.B_FEATS)))
     return d.select("s1_id", "cand_id", "p_a", "prob")
 
 
 # Countries are blocked separately, so scoring them one at a time is exact and keeps memory low.
-country = s1.select(pl.col("entity_id").alias("s1_id"), "country")
-blk = blk.join(country, on="s1_id")
 parts = []
-for c in blk["country"].unique(maintain_order=True).to_list():
-    parts.append(score(blk.filter(pl.col("country") == c).drop("country")))
+for c in countries:
+    parts.append(score(pl.read_parquet(blk_paths[c])))
     P.log(f"scored {c}")
-del blk
 df = pl.concat(parts)
 df.write_parquet(INTERIM / "test_scored.parquet")
 P.log(f"candidate pairs {df.height} for {s1.height} S1")

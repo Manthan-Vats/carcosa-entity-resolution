@@ -74,10 +74,20 @@ def _sib_scores(a: list[str], b: list[str], an: list[str], bn: list[str]) -> pl.
     })
 
 
-def sibling_features(df: pl.DataFrame, recs: pl.DataFrame, n_jobs: int = 16) -> pl.DataFrame:
+def sibling_features(df: pl.DataFrame, recs: pl.DataFrame, n_jobs: int = 16, chunk_s1: int = 100_000) -> pl.DataFrame:
     """Entity-centric evidence: how much a candidate looks like the other strong candidates of
-    the same S1 (records of one business resemble each other). Needs s1_id, cand_id, p_a."""
+    the same S1 (records of one business resemble each other). Needs s1_id, cand_id, p_a.
+    Features only use candidates of the same S1, so S1 chunks bound memory without changing results."""
     side = recs.select("entity_id", "name_n", "addr_n")
+    ids = df["s1_id"].unique(maintain_order=True)
+    aggs = [_sibling_chunk(df.filter(pl.col("s1_id").is_in(ids.slice(i, chunk_s1).implode())), side, n_jobs)
+            for i in range(0, len(ids), chunk_s1)]
+    return df.join(pl.concat(aggs), on=["s1_id", "cand_id"], how="left").with_columns(
+        pl.col("sib_name", "sib_addr", "sib_both").fill_null(-1), pl.col("sib_n_strong").fill_null(0)
+    )
+
+
+def _sibling_chunk(df: pl.DataFrame, side: pl.DataFrame, n_jobs: int) -> pl.DataFrame:
     c = df.select("s1_id", "cand_id", "p_a").join(side.rename({"entity_id": "cand_id"}), on="cand_id", how="left")
     sib = (
         c.join(c.rename({"cand_id": "o_id", "p_a": "o_p", "name_n": "o_name", "addr_n": "o_addr"}), on="s1_id")
@@ -87,14 +97,11 @@ def sibling_features(df: pl.DataFrame, recs: pl.DataFrame, n_jobs: int = 16) -> 
     parts = Parallel(n_jobs=n_jobs)(
         delayed(_sib_scores)(*(sib.slice(i, step)[k].to_list() for k in ("name_n", "o_name", "addr_n", "o_addr")))
         for i in range(0, sib.height, step)
-    )
+    ) or [_sib_scores([], [], [], [])]
     sib = pl.concat([sib.select("s1_id", "cand_id", "o_p"), pl.concat(parts)], how="horizontal")
-    agg = sib.group_by("s1_id", "cand_id").agg(
+    return sib.group_by("s1_id", "cand_id").agg(
         (pl.col("o_p") * pl.col("sn")).max().alias("sib_name"),
         (pl.col("o_p") * pl.col("sa")).max().alias("sib_addr"),
         (pl.col("o_p") * (pl.col("sn") + pl.col("sa")) / 2).max().alias("sib_both"),
         ((pl.col("o_p") > 0.5) & (pl.col("sn") >= 90)).sum().alias("sib_n_strong"),
-    )
-    return df.join(agg, on=["s1_id", "cand_id"], how="left").with_columns(
-        pl.col("sib_name", "sib_addr", "sib_both").fill_null(-1), pl.col("sib_n_strong").fill_null(0)
     )
