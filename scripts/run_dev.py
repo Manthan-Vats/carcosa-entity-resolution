@@ -34,13 +34,16 @@ if SMOKE:
     matched = gt.filter(pl.col("s1_id").is_in(keep.implode()))["cand_id"]
     noise = recs.filter(pl.col("src") != "1").sample(100_000, seed=0)["entity_id"]
     recs = recs.filter(pl.col("entity_id").is_in(pl.concat([keep, matched, noise]).implode()))
+stats = P.record_stats(recs)
+recs = recs.drop("business_name", "business_address")
 s1 = recs.filter(pl.col("src") == "1")
 
-blk_path = INTERIM / ("dev_block_smoke.parquet" if SMOKE else "dev_block.parquet")
+blk_name = "dev_block_smoke" if SMOKE else "dev_block"
+blk_path = INTERIM / f"{blk_name}.parquet"
 if blk_path.exists():
     blk = pl.read_parquet(blk_path)
 else:
-    blk = P.block(s1, recs.filter(pl.col("src") != "1"))
+    blk = P.block(s1, recs.filter(pl.col("src") != "1"), cache=INTERIM / blk_name)
     blk.write_parquet(blk_path)
 P.log(f"blocked pairs {blk.height}")
 
@@ -53,7 +56,6 @@ role = pl.concat([
     pl.DataFrame({"s1_id": f0_ids, "role": "te"}),
 ])
 labels = gt.with_columns(pl.lit(1, pl.Int8).alias("y"))
-stats = P.record_stats(recs)
 
 # Cheap features per country (context features need every S1 of the country), then keep only sampled S1.
 blk = blk.join(s1.select(pl.col("entity_id").alias("s1_id"), "country"), on="s1_id")

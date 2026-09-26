@@ -1,5 +1,7 @@
 """End-to-end steps: blocking -> cheap-feature pruning -> pair model -> selection."""
+import gc
 import time
+from pathlib import Path
 
 import lightgbm as lgb
 import numpy as np
@@ -31,47 +33,63 @@ def log(msg: str):
     print(time.strftime("%H:%M:%S"), msg, flush=True)
 
 
-def block(queries: pl.DataFrame, pool: pl.DataFrame) -> pl.DataFrame:
+def block(queries: pl.DataFrame, pool: pl.DataFrame, cache: Path | None = None) -> pl.DataFrame:
     """Per country, a union of three searches: joint name+address top-K_JOINT; name-only
     top-K_EMPTY among pool records without an address (the joint score cannot rank those);
-    and name+address+house-number top-K_NUM."""
-    out = []
+    and name+address+house-number top-K_NUM. With `cache`, each country is written to
+    `{cache}_{country}.parquet` and reused, so a crashed run resumes where it stopped."""
+    paths = []
     for (country,), qc in queries.group_by("country", maintain_order=True):
+        path = cache.with_name(f"{cache.name}_{country}.parquet") if cache else None
+        if path and path.exists():
+            paths.append(path)
+            continue
         pc = pool.filter(pl.col("country") == country)
         if pc.height == 0:
             continue
-        mats = B.embed(qc, pc, list(WEIGHTS_NUM))
-        r, c, v = B.topn(*B.joint(mats, WEIGHTS), K_JOINT)
-        joint = pl.DataFrame({"qi": r, "pi": c, "j_rank": B.ranks(r, v)})
-        r, c2, v = B.topn(*B.joint(mats, WEIGHTS_NUM), K_NUM)
-        joint = joint.join(pl.DataFrame({"qi": r, "pi": c2.astype(c.dtype), "n_rank": B.ranks(r, v)}),
-                           on=["qi", "pi"], how="full", coalesce=True)
-
-        empty_idx = np.flatnonzero((pc["addr_n"] == "").to_numpy())
-        if len(empty_idx):
-            re_, ce, ve = B.topn(mats["name"][0], mats["name"][1][empty_idx], K_EMPTY)
-            empty = pl.DataFrame({"qi": re_, "pi": empty_idx[ce].astype(c.dtype), "e_rank": B.ranks(re_, ve)})
-            pairs = joint.join(empty, on=["qi", "pi"], how="full", coalesce=True)
+        res = _block_country(qc, pc)
+        log(f"blocked {country}: {qc.height} queries, {pc.height} pool, {res.height} pairs")
+        if path:
+            res.write_parquet(path)
+            paths.append(path)
+            del res
         else:
-            pairs = joint.with_columns(pl.lit(None, pl.Int16).alias("e_rank"))
-        qi, pi = pairs["qi"].to_numpy(), pairs["pi"].to_numpy()
-        name_cos = B.rowwise_cos(*mats["name"], qi, pi)
-        addr_cos = B.rowwise_cos(*mats["addr"], qi, pi)
-        num_cos = B.rowwise_cos(*mats["num"], qi, pi)
-        del mats
-        out.append(pl.DataFrame({
-            "s1_id": qc["entity_id"].gather(qi),
-            "cand_id": pc["entity_id"].gather(pi),
-            "joint": WEIGHTS["name"] * name_cos + WEIGHTS["addr"] * addr_cos,
-            "name_cos": name_cos,
-            "addr_cos": addr_cos,
-            "num_cos": num_cos,
-            "j_rank": pairs["j_rank"].fill_null(K_JOINT),
-            "e_rank": pairs["e_rank"].fill_null(K_EMPTY),
-            "n_rank": pairs["n_rank"].fill_null(K_NUM),
-        }))
-        log(f"blocked {country}: {qc.height} queries, {pc.height} pool, {pairs.height} pairs")
-    return pl.concat(out)
+            paths.append(res)
+        gc.collect()
+    return pl.concat([pl.read_parquet(p) if isinstance(p, Path) else p for p in paths])
+
+
+def _block_country(qc: pl.DataFrame, pc: pl.DataFrame) -> pl.DataFrame:
+    mats = B.embed(qc, pc, list(WEIGHTS_NUM))
+    r, c, v = B.topn(*B.joint(mats, WEIGHTS), K_JOINT)
+    joint = pl.DataFrame({"qi": r, "pi": c, "j_rank": B.ranks(r, v)})
+    r, c2, v = B.topn(*B.joint(mats, WEIGHTS_NUM), K_NUM)
+    joint = joint.join(pl.DataFrame({"qi": r, "pi": c2.astype(c.dtype), "n_rank": B.ranks(r, v)}),
+                       on=["qi", "pi"], how="full", coalesce=True)
+
+    empty_idx = np.flatnonzero((pc["addr_n"] == "").to_numpy())
+    if len(empty_idx):
+        re_, ce, ve = B.topn(mats["name"][0], mats["name"][1][empty_idx], K_EMPTY)
+        empty = pl.DataFrame({"qi": re_, "pi": empty_idx[ce].astype(c.dtype), "e_rank": B.ranks(re_, ve)})
+        pairs = joint.join(empty, on=["qi", "pi"], how="full", coalesce=True)
+    else:
+        pairs = joint.with_columns(pl.lit(None, pl.Int16).alias("e_rank"))
+    qi, pi = pairs["qi"].to_numpy(), pairs["pi"].to_numpy()
+    name_cos = B.rowwise_cos(*mats["name"], qi, pi)
+    addr_cos = B.rowwise_cos(*mats["addr"], qi, pi)
+    num_cos = B.rowwise_cos(*mats["num"], qi, pi)
+    del mats
+    return pl.DataFrame({
+        "s1_id": qc["entity_id"].gather(qi),
+        "cand_id": pc["entity_id"].gather(pi),
+        "joint": WEIGHTS["name"] * name_cos + WEIGHTS["addr"] * addr_cos,
+        "name_cos": name_cos,
+        "addr_cos": addr_cos,
+        "num_cos": num_cos,
+        "j_rank": pairs["j_rank"].fill_null(K_JOINT),
+        "e_rank": pairs["e_rank"].fill_null(K_EMPTY),
+        "n_rank": pairs["n_rank"].fill_null(K_NUM),
+    })
 
 
 def record_stats(recs: pl.DataFrame) -> pl.DataFrame:

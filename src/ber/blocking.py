@@ -24,7 +24,9 @@ def _transform(vec: TfidfVectorizer, texts: list[str], n_jobs: int = 16) -> spar
 def fit_view(texts: pl.Series, view: str) -> TfidfVectorizer:
     cfg = {k: v for k, v in VIEWS[view].items() if k != "col"}
     sample = texts.sample(min(FIT_SAMPLE, len(texts)), seed=0).to_list()
-    return TfidfVectorizer(min_df=2, sublinear_tf=True, dtype=np.float32, **cfg).fit(sample)
+    vec = TfidfVectorizer(min_df=2, sublinear_tf=True, dtype=np.float32, **cfg).fit(sample)
+    vec.stop_words_ = None  # every pruned term; only for introspection, but copied to each worker
+    return vec
 
 
 def embed(queries: pl.DataFrame, pool: pl.DataFrame, views: list[str]):

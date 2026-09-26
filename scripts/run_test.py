@@ -18,17 +18,16 @@ model_a = lgb.Booster(model_file=str(MODELS / "stage_a.txt"))
 model_b = lgb.Booster(model_file=str(MODELS / "stage_b.txt"))
 
 recs = records("test")
+stats = P.record_stats(recs)
+recs = recs.drop("business_name", "business_address")
 s1 = recs.filter(pl.col("src") == "1")
 blk_path = INTERIM / "test_block.parquet"
 if blk_path.exists():
     blk = pl.read_parquet(blk_path)
 else:
-    blk = P.block(s1, recs.filter(pl.col("src") != "1"))
+    blk = P.block(s1, recs.filter(pl.col("src") != "1"), cache=INTERIM / "test_block")
     blk.write_parquet(blk_path)
 P.log(f"blocked pairs {blk.height}")
-
-
-stats = P.record_stats(recs)
 
 
 def score(pairs: pl.DataFrame) -> pl.DataFrame:

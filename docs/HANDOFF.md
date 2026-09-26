@@ -1,10 +1,16 @@
 # HANDOFF — read this first each session
 
-_Last updated: 2026-09-26 (end of session 2)_
+_Last updated: 2026-09-26 (session 3, in progress)_
 
 ## Goal now
 Leaderboard top is 0.9906 (many teams ~0.988). **Our first submission scored 0.902 on the portal** (dev f0 estimate was 0.936). Target: ≥0.99. Deadline ≈ 2026-09-28 00:00 IST (confirm on portal).
 Approach: research (papers, industry, white papers only — never other participants' repos), verify on dev, no guessing, then hand over files to upload.
+
+## Session 3 status (read first)
+- Background runs get killed under memory pressure (twice, during dev blocking). `run_dev.py` now runs in a separate PowerShell (log: `logs/run_dev_v2.log`, started ~23:20 with OLD code).
+- Memory fix written, NOT yet verified or committed: `stop_words_=None` after TF-IDF fit (was pickled into 16 joblib workers); `P.block(..., cache=INTERIM/"dev_block")` writes/reuses per-country `dev_block_{country}.parquet` and frees memory between countries; run scripts compute `record_stats` then drop raw name/address columns.
+- To verify once RAM is free: re-block the smoke subset and compare with the cached `dev_block_smoke.parquet` (must be identical), then commit.
+- PowerShell env var syntax: `$env:PYTHONIOENCODING="utf-8"` (not `set`).
 
 ## State of the code (all under src/ber, scripts/)
 - `normalize.py`: anyascii + lowercase + `&`→and; **learned Indic→Latin token dictionary** (`data/interim/translit_dict.json`, built by `scripts/build_translit.py` from dev-fold matched pairs; 1,339 name tokens, 17 address tokens; 96.4% of test Indic name tokens covered); `num_sig()` house/plot-number signature (column `num_n`).
