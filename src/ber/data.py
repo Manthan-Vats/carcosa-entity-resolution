@@ -5,6 +5,8 @@ from ber.io import load_source
 from ber.normalize import add_norm, num_sig
 from ber.paths import INTERIM
 
+ZERO_PAD = r"\b0+(\d)"  # "00604" -> "604"; num_n already strips leading zeros
+
 
 def records(split: str) -> pl.DataFrame:
     """All S1/S2/S3 records of a split with normalised name/address (cached)."""
@@ -14,10 +16,10 @@ def records(split: str) -> pl.DataFrame:
         if "num_n" not in df.columns:
             df = df.with_columns(pl.col("business_address").map_elements(num_sig, return_dtype=pl.Utf8).alias("num_n"))
             df.write_parquet(path)
-        return df
+        return df.with_columns(pl.col("addr_n").str.replace_all(ZERO_PAD, "$1"))
     df = pl.concat(
         [load_source(split, s).with_columns(pl.lit(s[-1]).alias("src")) for s in ("source1", "source2", "source3")]
     )
     df = add_norm(df)
     df.write_parquet(path)
-    return df
+    return df.with_columns(pl.col("addr_n").str.replace_all(ZERO_PAD, "$1"))

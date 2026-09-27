@@ -12,13 +12,18 @@ from ber import blocking as B
 from ber.features import group_features, sibling_features, string_features
 
 K_JOINT = 30
+K_NAME = 20
 K_EMPTY = 10
 K_NUM = 10
-WEIGHTS = {"name": 0.3, "addr": 0.7}
-WEIGHTS_NUM = {"name": 0.3, "addr": 0.5, "num": 0.2}
+# Name evidence is split between char 3-grams (typos) and whole words (rarer, so a higher max_df stays fast).
+WEIGHTS = {"name": 0.15, "nword": 0.15, "addr": 0.7}
+WEIGHTS_NAME = {"name": 0.3, "nword": 0.3, "addr": 0.4}
+WEIGHTS_NUM = {"name": 0.15, "nword": 0.15, "addr": 0.5, "num": 0.2}
+WEIGHTS_EMPTY = {"name": 0.5, "nword": 0.5}
 
 A_FEATS = [
-    "joint", "name_cos", "addr_cos", "num_cos", "j_rank", "e_rank", "n_rank", "joint_gap_s1", "joint_rk_s1", "joint_gap_cand",
+    "joint", "name_cos", "nword_cos", "addr_cos", "num_cos", "j_rank", "h_rank", "e_rank", "n_rank", "nword_cos_gap_s1",
+    "nword_cos_gap_cand", "joint_gap_s1", "joint_rk_s1", "joint_gap_cand",
     "joint_rk_cand", "name_cos_gap_s1", "name_cos_rk_s1", "name_cos_gap_cand", "name_cos_rk_cand",
     "addr_cos_gap_s1", "addr_cos_gap_cand", "num_cos_gap_s1", "num_cos_gap_cand", "n_cand_s1", "n_s1_cand", "is_s3", "c_addr_empty",
     "q_addr_len", "c_addr_len", "q_name_len", "c_name_len", "c_indic",
@@ -63,30 +68,35 @@ def _block_country(qc: pl.DataFrame, pc: pl.DataFrame) -> pl.DataFrame:
     mats = B.embed(qc, pc, list(WEIGHTS_NUM))
     r, c, v = B.topn(*B.joint(mats, WEIGHTS), K_JOINT)
     joint = pl.DataFrame({"qi": r, "pi": c, "j_rank": B.ranks(r, v)})
-    r, c2, v = B.topn(*B.joint(mats, WEIGHTS_NUM), K_NUM)
-    joint = joint.join(pl.DataFrame({"qi": r, "pi": c2.astype(c.dtype), "n_rank": B.ranks(r, v)}),
-                       on=["qi", "pi"], how="full", coalesce=True)
+    for w, k, col in ((WEIGHTS_NAME, K_NAME, "h_rank"), (WEIGHTS_NUM, K_NUM, "n_rank")):
+        r, c2, v = B.topn(*B.joint(mats, w), k)
+        joint = joint.join(pl.DataFrame({"qi": r, "pi": c2.astype(c.dtype), col: B.ranks(r, v)}),
+                           on=["qi", "pi"], how="full", coalesce=True)
 
     empty_idx = np.flatnonzero((pc["addr_n"] == "").to_numpy())
     if len(empty_idx):
-        re_, ce, ve = B.topn(mats["name"][0], mats["name"][1][empty_idx], K_EMPTY)
+        q_e, p_e = B.joint(mats, WEIGHTS_EMPTY)
+        re_, ce, ve = B.topn(q_e, p_e[empty_idx], K_EMPTY)
         empty = pl.DataFrame({"qi": re_, "pi": empty_idx[ce].astype(c.dtype), "e_rank": B.ranks(re_, ve)})
         pairs = joint.join(empty, on=["qi", "pi"], how="full", coalesce=True)
     else:
         pairs = joint.with_columns(pl.lit(None, pl.Int16).alias("e_rank"))
     qi, pi = pairs["qi"].to_numpy(), pairs["pi"].to_numpy()
     name_cos = B.rowwise_cos(*mats["name"], qi, pi)
+    nword_cos = B.rowwise_cos(*mats["nword"], qi, pi)
     addr_cos = B.rowwise_cos(*mats["addr"], qi, pi)
     num_cos = B.rowwise_cos(*mats["num"], qi, pi)
     del mats
     return pl.DataFrame({
         "s1_id": qc["entity_id"].gather(qi),
         "cand_id": pc["entity_id"].gather(pi),
-        "joint": WEIGHTS["name"] * name_cos + WEIGHTS["addr"] * addr_cos,
+        "joint": WEIGHTS["name"] * name_cos + WEIGHTS["nword"] * nword_cos + WEIGHTS["addr"] * addr_cos,
         "name_cos": name_cos,
+        "nword_cos": nword_cos,
         "addr_cos": addr_cos,
         "num_cos": num_cos,
         "j_rank": pairs["j_rank"].fill_null(K_JOINT),
+        "h_rank": pairs["h_rank"].fill_null(K_NAME),
         "e_rank": pairs["e_rank"].fill_null(K_EMPTY),
         "n_rank": pairs["n_rank"].fill_null(K_NUM),
     })
@@ -112,7 +122,7 @@ def cheap_features(pairs: pl.DataFrame, stats: pl.DataFrame) -> pl.DataFrame:
             (pl.col("c_addr_len") == 0).alias("c_addr_empty"),
         )
     )
-    return group_features(df, ["joint", "name_cos", "addr_cos", "num_cos"])
+    return group_features(df, ["joint", "name_cos", "nword_cos", "addr_cos", "num_cos"])
 
 
 def full_features(pairs: pl.DataFrame, recs: pl.DataFrame, n_jobs: int = 16) -> pl.DataFrame:

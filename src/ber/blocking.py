@@ -11,6 +11,7 @@ VIEWS = {
     "addr": dict(col="addr_n", analyzer="word", token_pattern=r"\S+", max_df=0.005),
     "addr3": dict(col="addr_n", analyzer="char_wb", ngram_range=(3, 3), max_df=0.005),
     "num": dict(col="num_n", analyzer="word", token_pattern=r"\S+", max_df=0.005),
+    "nword": dict(col="name_n", analyzer="word", token_pattern=r"\S+", max_df=0.03),
 }
 FIT_SAMPLE = 1_000_000
 

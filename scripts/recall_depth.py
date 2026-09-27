@@ -27,7 +27,9 @@ if ZEROS:
 pool = dev.filter(pl.col("src") != "1")
 gt = load_gt_pairs()
 
+import time
 for country in ["US", "India"]:
+    t0 = time.time()
     q = dev.filter((pl.col("src") == "1") & (pl.col("split") == "f0") & (pl.col("country") == country)).sample(N_QUERY, seed=0)
     pc = pool.filter(pl.col("country") == country)
     pid = pc["entity_id"].to_numpy()
@@ -52,4 +54,5 @@ for country in ["US", "India"]:
     for combo in [("joint", 30, "joint_num", 10), ("joint", 100, "name_heavy", 50), ("joint", 200, "name_heavy", 100), ("joint", 100, "name", 50)]:
         s = found[combo[:2]] | found[combo[2:]]
         print(f"  {combo} recall {len(s & truth) / len(truth):.4f} cands/q {len(s) / q.height:.1f}", flush=True)
+    print(f"  time {time.time() - t0:.0f}s", flush=True)
     del mats, views
