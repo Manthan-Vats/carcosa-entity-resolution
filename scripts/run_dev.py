@@ -40,49 +40,62 @@ s1 = recs.filter(pl.col("src") == "1")
 
 blk_name = "dev_block_smoke" if SMOKE else "dev_block"
 blk_path = INTERIM / f"{blk_name}.parquet"
-if blk_path.exists():
-    blk = pl.read_parquet(blk_path)
-else:
-    blk = P.block(s1, recs.filter(pl.col("src") != "1"), cache=INTERIM / blk_name)
-    blk.write_parquet(blk_path)
-P.log(f"blocked pairs {blk.height}")
+if not blk_path.exists():
+    P.block(s1, recs.filter(pl.col("src") != "1"), cache=INTERIM / blk_name).write_parquet(blk_path)
 
-train_ids = s1.filter(pl.col("split").is_in(["f1", "f2", "f3"]))["entity_id"].sample(N_TRAIN_S1, seed=0)
-valid_ids = s1.filter(pl.col("split") == "f4")["entity_id"].sample(N_TRAIN_S1 // 3, seed=0)
+# Stage A trains on a sample (all cheap-feature rows of every S1 would not fit in memory);
+# stage B then uses every f1-f4 S1, pruned country by country right after its cheap features.
+f123 = s1.filter(pl.col("split").is_in(["f1", "f2", "f3"]))["entity_id"]
+f4 = s1.filter(pl.col("split") == "f4")["entity_id"]
 f0_ids = s1.filter(pl.col("split") == "f0")["entity_id"]
+a_ids = pl.concat([f123.sample(N_TRAIN_S1, seed=0), f4.sample(N_TRAIN_S1 // 3, seed=0)])
 role = pl.concat([
-    pl.DataFrame({"s1_id": train_ids, "role": "tr"}),
-    pl.DataFrame({"s1_id": valid_ids, "role": "va"}),
+    pl.DataFrame({"s1_id": f123, "role": "tr"}),
+    pl.DataFrame({"s1_id": f4, "role": "va"}),
     pl.DataFrame({"s1_id": f0_ids, "role": "te"}),
-])
+]).with_columns(pl.col("s1_id").is_in(a_ids.implode()).alias("in_a"))
 labels = gt.with_columns(pl.lit(1, pl.Int8).alias("y"))
+countries = s1["country"].unique(maintain_order=True).to_list()
 
-# Cheap features per country (context features need every S1 of the country), then keep only sampled S1.
-blk = blk.join(s1.select(pl.col("entity_id").alias("s1_id"), "country"), on="s1_id")
+
+def cheap(c: str) -> pl.DataFrame:
+    """Cheap features for one country (context features need every S1 of the country)."""
+    ids = s1.filter(pl.col("country") == c)["entity_id"].implode()
+    blk = pl.scan_parquet(blk_path).filter(pl.col("s1_id").is_in(ids)).collect()
+    d = P.cheap_features(blk, stats)
+    return d.join(role, on="s1_id").join(labels, on=["s1_id", "cand_id"], how="left").with_columns(pl.col("y").fill_null(0))
+
+
 parts = []
-for c in blk["country"].unique(maintain_order=True).to_list():
-    d = P.cheap_features(blk.filter(pl.col("country") == c).drop("country"), stats)
-    d = d.join(role, on="s1_id").join(labels, on=["s1_id", "cand_id"], how="left").with_columns(pl.col("y").fill_null(0))
-    parts.append(d)
-    P.log(f"cheap features {c}: {d.height} rows kept")
+for c in countries:
+    parts.append(cheap(c).filter(pl.col("in_a") | (pl.col("role") == "te")))
+    P.log(f"cheap features {c}: {parts[-1].height} rows kept")
 df = pl.concat(parts)
-del blk, parts
+del parts
 n_true_f0 = gt.join(pl.DataFrame({"s1_id": f0_ids}), on="s1_id").height
 blk_f0 = df.filter(pl.col("role") == "te")
 block_stats = {"block_pairs_per_s1": blk_f0.height / len(f0_ids), "block_recall": blk_f0["y"].sum() / n_true_f0}
 P.log(json.dumps(block_stats))
 
-tr, va, te = (df.filter(pl.col("role") == r) for r in ("tr", "va", "te"))
+tr, va = (df.filter(pl.col("in_a") & (pl.col("role") == r)) for r in ("tr", "va"))
 del df, blk_f0
 model_a = P.train_lgb(tr, va, P.A_FEATS)
 model_a.save_model(str(MODELS / "stage_a.txt"))
 
-# Prune threshold: keep RECALL_KEEP of the positives that blocking found (valid fold).
+# Prune threshold: keep RECALL_KEEP of the positives that blocking found (valid sample).
 pos = np.sort(P.predict(model_a, va.filter(pl.col("y") == 1), P.A_FEATS))
 tau = float(pos[int((1 - RECALL_KEEP) * len(pos))])
 P.log(f"tau {tau:.5f}")
+del tr, va
 
-tr, va, te = (P.prune(d, model_a, tau, MAX_CANDS) for d in (tr, va, te))
+pruned = []
+for c in countries:
+    pruned.append(P.prune(cheap(c), model_a, tau, MAX_CANDS))
+    P.log(f"pruned {c}: {pruned[-1].height} rows")
+df = pl.concat(pruned)
+del pruned
+tr, va, te = (df.filter(pl.col("role") == r) for r in ("tr", "va", "te"))
+del df
 tr, va, te = (P.full_features(d, recs) for d in (tr, va, te))
 P.log(f"stage B rows train {tr.height} valid {va.height} f0 {te.height}")
 model_b = P.train_lgb(tr, va, P.B_FEATS)
