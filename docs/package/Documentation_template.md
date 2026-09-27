@@ -1,13 +1,13 @@
 # ML Challenge 2026: Business Entity Resolution Solution Template
 
 **Team Name:** carcosa  
-**Team Members:** {{MEMBERS}}  
+**Team Members:** Manthan Vats, Navyansh Kesarwani, Rohan Kumar  
 **Submission Date:** 27 September 2026
 
 ---
 
 ## 1. Executive Summary
-We match every Source 1 business to its Source 2/3 records with a four-stage pipeline that runs on a laptop CPU: a union of sparse TF-IDF searches over several text views (blocking), a LightGBM pruner that keeps a small candidate set, a LightGBM pair model with string, context and "sibling" (entity-centric) features, and a per-entity decision rule that maximises expected F0.5. The largest gains came from measuring where true matches are lost: tuning which tokens the blocking keeps (a name-word view with a looser frequency cut-off) raised blocking recall on our held-out fold from 0.940 to 0.978, and a learned Indic→Latin token dictionary handles names written in Indian scripts. Dev F0.5 (fold f0, 353k S1): {{DEV_F05}}; public leaderboard: {{PORTAL}}.
+We match every Source 1 business to its Source 2/3 records with a four-stage pipeline that runs on a laptop CPU: a union of sparse TF-IDF searches over several text views (blocking), a LightGBM pruner that keeps a small candidate set, a LightGBM pair model with string, context and "sibling" (entity-centric) features, and a per-entity decision rule that maximises expected F0.5. The largest gains came from measuring where true matches are lost: tuning which tokens the blocking keeps (a name-word view with a looser frequency cut-off) raised blocking recall on our held-out fold from 0.940 to 0.978, and a learned Indic→Latin token dictionary handles names written in Indian scripts. Dev F0.5 (fold f0, 353k S1): 0.974; public leaderboard: {{PORTAL}} (previous version: 0.927).
 
 ---
 
@@ -39,7 +39,7 @@ Text normalisation (all countries): anyascii transliteration + lower-casing + `&
   - address words, max_df 0.005; house-number signature words, max_df 0.005
   
   Four exact top-k searches (sparse_dot_topn) are unioned: joint name+address score top-30; name-heavy score top-20; name+address+number score top-10; and name-only top-10 among pool records with an empty address (which the joint score cannot rank).
-- **Candidate pairs generated:** blocking ≈ 55 per S1 before pruning; the stage A LightGBM pruner keeps candidates with probability ≥ τ (τ set to keep 99.5 % of the blocked true matches on a validation fold) and at most 10 per S1. `candidate_pairs.tsv` contains this pruned set: {{CANDS_PER_S1}} candidates per S1 on test ({{CANDS_TOTAL}} pairs).
+- **Candidate pairs generated:** blocking ≈ 55 per S1 before pruning; the stage A LightGBM pruner keeps candidates with probability ≥ τ (τ set to keep 99.5 % of the blocked true matches on a validation fold) and at most 10 per S1. `candidate_pairs.tsv` contains this pruned set: 6.31 candidates per S1 on test (10,926,521 pairs).
 - **How you ensured true matches were not lost:** we measured blocking recall on held-out S1 for every design choice (logs of recall vs depth and vs frequency cut-off). Findings: a too-strict frequency cut-off on name 3-grams deleted most name evidence; adding the name-word view raised recall at ~32 candidates from 0.954 → 0.976 (US) and 0.901 → 0.955 (India) on samples, at 1.6–1.9× search cost; denser settings reached 0.98+ but cost 9–14× and did not fit the time budget. On the full f0 fold (353k S1), blocking recall rose from 0.940 to 0.978. The pruner loses < 1 % of the blocked true matches.
 
 ---
@@ -63,12 +63,12 @@ Text normalisation (all countries): anyascii transliteration + lower-casing + `&
 |---|---|---|---|---|
 | r001 | joint TF-IDF top-15 + prune + LightGBM | 0.936 | 0.893 | 0.902 |
 | r002 | + empty-address and number searches, Indic dictionary, sibling features | 0.955 | 0.940 | 0.927 |
-| r004 | + name-word view, name-heavy search, cross-fitted stage A | {{DEV_F05}} | 0.978 | {{PORTAL}} |
+| r004 | + name-word view, name-heavy search, cross-fitted stage A | 0.974 | 0.978 | {{PORTAL}} |
 
-- **F_0.5 Score (macro):** {{DEV_F05}} on fold f0 (US {{DEV_US}}, India {{DEV_IN}}).
+- **F_0.5 Score (macro):** 0.974 on fold f0 (US 0.977, India 0.970).
 - **Common false positives (wrong merges):** different businesses at the same address with similar generic names (e.g. two "… Services" at one building); chain branches with identical names and nearby numbers. Precision on dev is ≈ 0.99, so these are rare.
 - **Common false negatives (missed matches):** copies whose address is reduced to "number, city, state code" and whose name is in an Indian script or heavily changed (extra/dropped words plus typos); copies with an empty address and a common name. Loss decomposition for r002: 63 % of missed pairs were never retrieved by blocking (addressed in r004), 32 % were retrieved but rejected by the pair model.
-- **France:** no labels exist; aggregate checks show French top candidates have the highest address similarity of all countries, and the French candidates the model rejects have very different names and numbers, consistent with genuinely unmatched S1 rather than a normalisation failure.
+- **France:** no labels exist; aggregate checks show French top candidates have the highest address similarity of all countries, and the French candidates the model rejects have very different names and numbers, consistent with genuinely unmatched S1 rather than a normalisation failure. The name-word view fixed the one French gap we could see without labels: French names are short (3.1 tokens), so a strict cut-off on name 3-grams removed most of their evidence. With r004 the share of French S1 predicted as "no match" fell from 12.5 % to 5.2 %, in line with the US (5.4 %) and India (6.0 %), and matches per French S1 rose from 2.75 to 3.25.
 
 ---
 
