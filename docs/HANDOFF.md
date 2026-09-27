@@ -6,7 +6,14 @@ _Last updated: 2026-09-26 (session 3, in progress)_
 Leaderboard top is 0.9906 (many teams ~0.988). **Our first submission scored 0.902 on the portal** (dev f0 estimate was 0.936). Target: ≥0.99. Deadline ≈ 2026-09-28 00:00 IST (confirm on portal).
 Approach: research (papers, industry, white papers only — never other participants' repos), verify on dev, no guessing, then hand over files to upload.
 
-## Session 3 status (2026-09-27, read first)
+## FINAL (2026-09-27 23:10 IST)
+- Public LB: 0.902 (v1) -> 0.927 (r002) -> **0.959 (r004)**. Dev f0 r004 0.9742 (US .977, IN .970), block recall .978, oracle .991.
+- r004 = name-word TF-IDF view (max_df .03) + name-heavy@20 search + zero-strip + cross-fitted stage A + chunked cheap features. Models in models/ (= models_r004/).
+- Final zip: package/carcosa_submission.zip (scripts/make_package.py; docs/package/ holds README + filled Documentation_template.md). Validator PASS with --check-ids.
+- France empty-prediction rate fell 12.5% -> 5.2% with the name-word view.
+- Next levers if continued: denser address view (addr max_df .02: India recall +1.3 pt at ~2x cost), candidate threshold tau .03 (-14% candidates for ~-0.0005 F0.5), dense retriever.
+
+## Session 3 status (2026-09-27)
 - Portal: v1 0.902 -> **r002 0.927** (submitted 08:18 IST; only matching_results.tsv is uploaded, candidate_pairs.tsv goes in the final zip only).
 - Heavy runs go in a separate PowerShell window (`$env:PYTHONIOENCODING="utf-8"`; `uv run python scripts/X.py > logs\X.log 2>&1`); background jobs get killed under memory pressure.
 - Memory fixes (verified identical output): per-country block caches `data/interim/{dev,test}_block_{country}.parquet`, `stop_words_=None`, sibling features chunked by S1, run_test loads one country at a time.
