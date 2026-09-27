@@ -6,11 +6,16 @@ _Last updated: 2026-09-26 (session 3, in progress)_
 Leaderboard top is 0.9906 (many teams ~0.988). **Our first submission scored 0.902 on the portal** (dev f0 estimate was 0.936). Target: ≥0.99. Deadline ≈ 2026-09-28 00:00 IST (confirm on portal).
 Approach: research (papers, industry, white papers only — never other participants' repos), verify on dev, no guessing, then hand over files to upload.
 
-## Session 3 status (read first)
-- Background runs get killed under memory pressure (twice, during dev blocking). `run_dev.py` now runs in a separate PowerShell (log: `logs/run_dev_v2.log`, started ~23:20 with OLD code).
-- Memory fix written, NOT yet verified or committed: `stop_words_=None` after TF-IDF fit (was pickled into 16 joblib workers); `P.block(..., cache=INTERIM/"dev_block")` writes/reuses per-country `dev_block_{country}.parquet` and frees memory between countries; run scripts compute `record_stats` then drop raw name/address columns.
-- To verify once RAM is free: re-block the smoke subset and compare with the cached `dev_block_smoke.parquet` (must be identical), then commit.
-- PowerShell env var syntax: `$env:PYTHONIOENCODING="utf-8"` (not `set`).
+## Session 3 status (2026-09-27, read first)
+- Portal: v1 0.902 -> **r002 0.927** (submitted 08:18 IST; only matching_results.tsv is uploaded, candidate_pairs.tsv goes in the final zip only).
+- Heavy runs go in a separate PowerShell window (`$env:PYTHONIOENCODING="utf-8"`; `uv run python scripts/X.py > logs\X.log 2>&1`); background jobs get killed under memory pressure.
+- Memory fixes (verified identical output): per-country block caches `data/interim/{dev,test}_block_{country}.parquet`, `stop_words_=None`, sibling features chunked by S1, run_test loads one country at a time.
+- r003 (stage B on all f1-f3) 0.9535 < r002 0.9546 -> kept r002 (models/ = models_r002/). Cross-fitted stage A (stage_a1/2.txt, OOF p_a) is coded + smoke-tested (commit c8c23e6), NOT yet run at full size.
+- Loss decomposition r002 dev f0: precision 0.991, FN 117k = 73.5k not blocked + 6k pruned + 37.5k rejected by stage B. Oracle on all blocked pairs 0.975 -> blocking recall is the cap.
+- France: its top candidates have the highest address similarity; rejected ones have very different names (0.30) -> no evidence of a normalisation failure. No French abbreviation list (dropped).
+- Second-hop retrieval: missed records are not closer to found siblings than to S1 (73.8 vs 74.0) -> dropped.
+- Candidate-set size (dev f0, approx): stage A tau 0.03 gives 4.80 cands/S1 (-14%) for -0.0005 F0.5 -> set at the end in models/config.json.
+- **Blocking max_df is the big lever** (logs/recall_depth*.log, logs/maxdf_grid*.log): joint@30+name_heavy@20 recall US .954/IN .901 at max_df .005 -> .973/.957 at name .01/addr .05 -> .982/.978 at .05/.05, but search is 3-9x slower (full dev+test would take 6-10+ h). Testing a name-WORD view (rarer tokens, short postings) as a cheaper way to get the name signal.
 
 ## State of the code (all under src/ber, scripts/)
 - `normalize.py`: anyascii + lowercase + `&`→and; **learned Indic→Latin token dictionary** (`data/interim/translit_dict.json`, built by `scripts/build_translit.py` from dev-fold matched pairs; 1,339 name tokens, 17 address tokens; 96.4% of test Indic name tokens covered); `num_sig()` house/plot-number signature (column `num_n`).
