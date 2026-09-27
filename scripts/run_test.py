@@ -29,7 +29,7 @@ if not all(p.exists() for p in blk_paths.values()):
 
 
 def score(pairs: pl.DataFrame) -> pl.DataFrame:
-    d = P.prune(P.cheap_features(pairs, stats), models_a, cfg["tau"], cfg["max_cands"])
+    d = P.cheap_features(pairs, stats, lambda x: P.prune(x, models_a, cfg["tau"], cfg["max_cands"]))
     P.log(f"pruned to {d.height} pairs")
     d = P.full_features(d, recs)
     d = d.with_columns(pl.Series("prob", P.predict(model_b, d, P.B_FEATS)))

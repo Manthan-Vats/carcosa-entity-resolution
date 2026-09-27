@@ -21,7 +21,7 @@ from ber.paths import INTERIM, ROOT
 
 SMOKE = "--smoke" in sys.argv
 MODELS = ROOT / ("models_smoke" if SMOKE else "models")
-N_TRAIN_S1 = 5_000 if SMOKE else 400_000
+N_TRAIN_S1 = 5_000 if SMOKE else 250_000
 RECALL_KEEP = 0.995
 MAX_CANDS = 10
 
@@ -63,24 +63,30 @@ labels = gt.with_columns(pl.lit(1, pl.Int8).alias("y"))
 countries = s1["country"].unique(maintain_order=True).to_list()
 
 
-def cheap(c: str) -> pl.DataFrame:
-    """Cheap features for one country (context features need every S1 of the country)."""
+def cheap(c: str, keep) -> pl.DataFrame:
+    """Cheap features for one country, S1 chunk by chunk; `keep` filters or prunes each chunk."""
     ids = s1.filter(pl.col("country") == c)["entity_id"].implode()
     blk = pl.scan_parquet(blk_path).filter(pl.col("s1_id").is_in(ids)).collect()
-    d = P.cheap_features(blk, stats)
-    return d.join(role, on="s1_id").join(labels, on=["s1_id", "cand_id"], how="left").with_columns(pl.col("y").fill_null(0))
 
+    def each(d):
+        d = d.join(role, on="s1_id").join(labels, on=["s1_id", "cand_id"], how="left").with_columns(pl.col("y").fill_null(0))
+        return keep(d)
+    return P.cheap_features(blk, stats, each)
+
+
+n_true_f0 = gt.join(pl.DataFrame({"s1_id": f0_ids}), on="s1_id").height
+blk_f0 = pl.scan_parquet(blk_path).filter(pl.col("s1_id").is_in(f0_ids.implode())).select("s1_id", "cand_id").collect()
+block_stats = {"block_pairs_per_s1": blk_f0.height / len(f0_ids),
+               "block_recall": blk_f0.join(labels, on=["s1_id", "cand_id"]).height / n_true_f0}
+P.log(json.dumps(block_stats))
+del blk_f0
 
 parts = []
 for c in countries:
-    parts.append(cheap(c).filter((pl.col("half") > 0) | pl.col("va_a") | (pl.col("role") == "te")))
+    parts.append(cheap(c, lambda d: d.filter((pl.col("half") > 0) | pl.col("va_a"))))
     P.log(f"cheap features {c}: {parts[-1].height} rows kept")
 df = pl.concat(parts)
 del parts
-n_true_f0 = gt.join(pl.DataFrame({"s1_id": f0_ids}), on="s1_id").height
-blk_f0 = df.filter(pl.col("role") == "te")
-block_stats = {"block_pairs_per_s1": blk_f0.height / len(f0_ids), "block_recall": blk_f0["y"].sum() / n_true_f0}
-P.log(json.dumps(block_stats))
 
 va = df.filter(pl.col("va_a"))
 models_a = []
@@ -96,7 +102,7 @@ for f in MODELS.glob("stage_a.txt"):
 pos = np.sort(P.stage_a(va.filter(pl.col("y") == 1), models_a))
 tau = float(pos[int((1 - RECALL_KEEP) * len(pos))])
 P.log(f"tau {tau:.5f}")
-del df, va, blk_f0
+del df, va
 
 
 def oof_prune(d: pl.DataFrame) -> pl.DataFrame:
@@ -108,7 +114,7 @@ def oof_prune(d: pl.DataFrame) -> pl.DataFrame:
 
 pruned = []
 for c in countries:
-    pruned.append(oof_prune(cheap(c)))
+    pruned.append(cheap(c, oof_prune))
     P.log(f"pruned {c}: {pruned[-1].height} rows")
 df = pl.concat(pruned)
 del pruned

@@ -111,18 +111,43 @@ def record_stats(recs: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def cheap_features(pairs: pl.DataFrame, stats: pl.DataFrame) -> pl.DataFrame:
-    df = (
-        pairs.join(stats.select(pl.col("entity_id").alias("s1_id"), pl.col("name_len").alias("q_name_len"),
-                                pl.col("addr_len").alias("q_addr_len")), on="s1_id")
-        .join(stats.select(pl.col("entity_id").alias("cand_id"), pl.col("name_len").alias("c_name_len"),
-                           pl.col("addr_len").alias("c_addr_len"), pl.col("indic").alias("c_indic")), on="cand_id")
-        .with_columns(
-            pl.col("cand_id").str.starts_with("S3-").alias("is_s3"),
-            (pl.col("c_addr_len") == 0).alias("c_addr_empty"),
+SCORES = ["joint", "name_cos", "nword_cos", "addr_cos", "num_cos"]
+S1_RANKED = ["joint", "name_cos"]
+CAND_RANKED = ["joint", "name_cos"]
+
+
+def cheap_features(pairs: pl.DataFrame, stats: pl.DataFrame, each=None, chunk_s1: int = 150_000) -> pl.DataFrame:
+    """Stage A features. Candidate-level context (max score, rank and count of a candidate over all
+    S1) needs the whole country, so it is computed once on narrow tables; the rest runs per S1
+    chunk and `each` (filter / prune) is applied to every chunk to keep memory low."""
+    cand = pairs.group_by("cand_id").agg([pl.col(c).max().alias(f"{c}_cmax") for c in SCORES] + [pl.len().alias("n_s1_cand")])
+    rk = pairs.select("s1_id", "cand_id", *[
+        pl.col(c).rank("ordinal", descending=True).over("cand_id").cast(pl.UInt32).alias(f"{c}_rk_cand") for c in CAND_RANKED])
+    q_stats = stats.select(pl.col("entity_id").alias("s1_id"), pl.col("name_len").alias("q_name_len"), pl.col("addr_len").alias("q_addr_len"))
+    c_stats = stats.select(pl.col("entity_id").alias("cand_id"), pl.col("name_len").alias("c_name_len"),
+                           pl.col("addr_len").alias("c_addr_len"), pl.col("indic").alias("c_indic"))
+    ids = pairs["s1_id"].unique(maintain_order=True)
+    out = []
+    for i in range(0, len(ids), chunk_s1):
+        chunk = ids.slice(i, chunk_s1).implode()
+        d = (
+            pairs.filter(pl.col("s1_id").is_in(chunk))
+            .join(rk.filter(pl.col("s1_id").is_in(chunk)), on=["s1_id", "cand_id"], how="left")
+            .join(cand, on="cand_id", how="left")
+            .join(q_stats, on="s1_id", how="left")
+            .join(c_stats, on="cand_id", how="left")
+            .with_columns(
+                *[(pl.col(c) - pl.col(c).max().over("s1_id")).alias(f"{c}_gap_s1") for c in SCORES],
+                *[pl.col(c).rank("ordinal", descending=True).over("s1_id").alias(f"{c}_rk_s1") for c in S1_RANKED],
+                *[(pl.col(c) - pl.col(f"{c}_cmax")).alias(f"{c}_gap_cand") for c in SCORES],
+                pl.len().over("s1_id").alias("n_cand_s1"),
+                pl.col("cand_id").str.starts_with("S3-").alias("is_s3"),
+                (pl.col("c_addr_len") == 0).alias("c_addr_empty"),
+            )
+            .drop([f"{c}_cmax" for c in SCORES])
         )
-    )
-    return group_features(df, ["joint", "name_cos", "nword_cos", "addr_cos", "num_cos"])
+        out.append(each(d) if each else d)
+    return pl.concat(out)
 
 
 def full_features(pairs: pl.DataFrame, recs: pl.DataFrame, n_jobs: int = 16) -> pl.DataFrame:
