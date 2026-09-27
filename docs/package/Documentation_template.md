@@ -7,7 +7,7 @@
 ---
 
 ## 1. Executive Summary
-We match every Source 1 business to its Source 2/3 records with a four-stage pipeline that runs on a laptop CPU: a union of sparse TF-IDF searches over several text views (blocking), a LightGBM pruner that keeps a small candidate set, a LightGBM pair model with string, context and "sibling" (entity-centric) features, and a per-entity decision rule that maximises expected F0.5. The largest gains came from measuring where true matches are lost: tuning which tokens the blocking keeps (a name-word view with a looser frequency cut-off) raised blocking recall on our held-out fold from 0.940 to 0.978, and a learned Indic→Latin token dictionary handles names written in Indian scripts. Dev F0.5 (fold f0, 353k S1): 0.974; public leaderboard: {{PORTAL}} (previous version: 0.927).
+We match every Source 1 business to its Source 2/3 records with a four-stage pipeline that runs on a laptop CPU: a union of sparse TF-IDF searches over several text views (blocking), a LightGBM pruner that keeps a small candidate set, a LightGBM pair model with string, context and "sibling" (entity-centric) features, and a per-entity decision rule that maximises expected F0.5. The largest gains came from measuring where true matches are lost: tuning which tokens the blocking keeps (a name-word view with a looser frequency cut-off) raised blocking recall on our held-out fold from 0.940 to 0.978, and a learned Indic→Latin token dictionary handles names written in Indian scripts. Dev F0.5 (fold f0, 353k S1): 0.974; public leaderboard: 0.959 (previous version: 0.927).
 
 ---
 
@@ -63,7 +63,7 @@ Text normalisation (all countries): anyascii transliteration + lower-casing + `&
 |---|---|---|---|---|
 | r001 | joint TF-IDF top-15 + prune + LightGBM | 0.936 | 0.893 | 0.902 |
 | r002 | + empty-address and number searches, Indic dictionary, sibling features | 0.955 | 0.940 | 0.927 |
-| r004 | + name-word view, name-heavy search, cross-fitted stage A | 0.974 | 0.978 | {{PORTAL}} |
+| r004 | + name-word view, name-heavy search, cross-fitted stage A | 0.974 | 0.978 | 0.959 |
 
 - **F_0.5 Score (macro):** 0.974 on fold f0 (US 0.977, India 0.970).
 - **Common false positives (wrong merges):** different businesses at the same address with similar generic names (e.g. two "… Services" at one building); chain branches with identical names and nearby numbers. Precision on dev is ≈ 0.99, so these are rare.
@@ -73,7 +73,7 @@ Text normalisation (all countries): anyascii transliteration + lower-casing + `&
 ---
 
 ## 6. Conclusion
-A classic blocking + learned matching pipeline, driven by measuring where true matches are lost, reached {{PORTAL}} on the public leaderboard on a laptop CPU with no external data. The decisive lessons were that blocking recall caps everything, that token-frequency cut-offs must be tuned per view (names need a word view), and that the decision rule should optimise the metric per entity. Next steps would be a learned dense retriever for the hardest truncated/transliterated copies and a denser address view on more compute.
+A classic blocking + learned matching pipeline, driven by measuring where true matches are lost, reached 0.959 on the public leaderboard on a laptop CPU with no external data. The decisive lessons were that blocking recall caps everything, that token-frequency cut-offs must be tuned per view (names need a word view), and that the decision rule should optimise the metric per entity. Next steps would be a learned dense retriever for the hardest truncated/transliterated copies and a denser address view on more compute.
 
 ---
 
