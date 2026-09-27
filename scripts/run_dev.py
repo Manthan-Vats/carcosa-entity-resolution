@@ -43,17 +43,22 @@ blk_path = INTERIM / f"{blk_name}.parquet"
 if not blk_path.exists():
     P.block(s1, recs.filter(pl.col("src") != "1"), cache=INTERIM / blk_name).write_parquet(blk_path)
 
-# Stage A trains on a sample (all cheap-feature rows of every S1 would not fit in memory);
-# stage B then uses every f1-f4 S1, pruned country by country right after its cheap features.
+# Stage A is cross-fitted on two halves of a sample (all cheap-feature rows would not fit in memory):
+# each half gets out-of-fold p_a from the other half's model, every other S1 the average of both.
+# Stage B then uses every f1-f4 S1, pruned country by country right after its cheap features.
 f123 = s1.filter(pl.col("split").is_in(["f1", "f2", "f3"]))["entity_id"]
 f4 = s1.filter(pl.col("split") == "f4")["entity_id"]
 f0_ids = s1.filter(pl.col("split") == "f0")["entity_id"]
-a_ids = pl.concat([f123.sample(N_TRAIN_S1, seed=0), f4.sample(N_TRAIN_S1 // 3, seed=0)])
-role = pl.concat([
-    pl.DataFrame({"s1_id": f123, "role": "tr"}),
-    pl.DataFrame({"s1_id": f4, "role": "va"}),
-    pl.DataFrame({"s1_id": f0_ids, "role": "te"}),
-]).with_columns(pl.col("s1_id").is_in(a_ids.implode()).alias("in_a"))
+a_ids = f123.sample(2 * N_TRAIN_S1, seed=0)
+role = (
+    pl.concat([
+        pl.DataFrame({"s1_id": f123, "role": "tr"}),
+        pl.DataFrame({"s1_id": f4, "role": "va"}),
+        pl.DataFrame({"s1_id": f0_ids, "role": "te"}),
+    ])
+    .join(pl.DataFrame({"s1_id": a_ids, "half": (np.arange(len(a_ids)) % 2 + 1).astype(np.int8)}), on="s1_id", how="left")
+    .with_columns(pl.col("half").fill_null(0), pl.col("s1_id").is_in(f4.sample(N_TRAIN_S1 // 3, seed=0).implode()).alias("va_a"))
+)
 labels = gt.with_columns(pl.lit(1, pl.Int8).alias("y"))
 countries = s1["country"].unique(maintain_order=True).to_list()
 
@@ -68,7 +73,7 @@ def cheap(c: str) -> pl.DataFrame:
 
 parts = []
 for c in countries:
-    parts.append(cheap(c).filter(pl.col("in_a") | (pl.col("role") == "te")))
+    parts.append(cheap(c).filter((pl.col("half") > 0) | pl.col("va_a") | (pl.col("role") == "te")))
     P.log(f"cheap features {c}: {parts[-1].height} rows kept")
 df = pl.concat(parts)
 del parts
@@ -77,20 +82,33 @@ blk_f0 = df.filter(pl.col("role") == "te")
 block_stats = {"block_pairs_per_s1": blk_f0.height / len(f0_ids), "block_recall": blk_f0["y"].sum() / n_true_f0}
 P.log(json.dumps(block_stats))
 
-tr, va = (df.filter(pl.col("in_a") & (pl.col("role") == r)) for r in ("tr", "va"))
-del df, blk_f0
-model_a = P.train_lgb(tr, va, P.A_FEATS)
-model_a.save_model(str(MODELS / "stage_a.txt"))
+va = df.filter(pl.col("va_a"))
+models_a = []
+for h in (1, 2):
+    m = P.train_lgb(df.filter(pl.col("half") == h), va, P.A_FEATS)
+    m.save_model(str(MODELS / f"stage_a{h}.txt"))
+    models_a.append(m)
+    P.log(f"stage A half {h}: {m.best_iteration} rounds")
+for f in MODELS.glob("stage_a.txt"):
+    f.unlink()
 
 # Prune threshold: keep RECALL_KEEP of the positives that blocking found (valid sample).
-pos = np.sort(P.predict(model_a, va.filter(pl.col("y") == 1), P.A_FEATS))
+pos = np.sort(P.stage_a(va.filter(pl.col("y") == 1), models_a))
 tau = float(pos[int((1 - RECALL_KEEP) * len(pos))])
 P.log(f"tau {tau:.5f}")
-del tr, va
+del df, va, blk_f0
+
+
+def oof_prune(d: pl.DataFrame) -> pl.DataFrame:
+    p1, p2 = (P.predict(m, d, P.A_FEATS) for m in models_a)
+    half = d["half"].to_numpy()
+    p_a = np.where(half == 1, p2, np.where(half == 2, p1, (p1 + p2) / 2)).astype(np.float32)
+    return P.prune(d, models_a, tau, MAX_CANDS, p_a=p_a)
+
 
 pruned = []
 for c in countries:
-    pruned.append(P.prune(cheap(c), model_a, tau, MAX_CANDS))
+    pruned.append(oof_prune(cheap(c)))
     P.log(f"pruned {c}: {pruned[-1].height} rows")
 df = pl.concat(pruned)
 del pruned

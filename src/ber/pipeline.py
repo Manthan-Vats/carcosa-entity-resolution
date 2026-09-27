@@ -132,8 +132,15 @@ def full_features(pairs: pl.DataFrame, recs: pl.DataFrame, n_jobs: int = 16) -> 
     return sibling_features(df, recs, n_jobs)
 
 
-def prune(df: pl.DataFrame, model: lgb.Booster, tau: float, max_cands: int) -> pl.DataFrame:
-    df = df.with_columns(pl.Series("p_a", predict(model, df, A_FEATS)))
+def stage_a(df: pl.DataFrame, models: list[lgb.Booster]) -> np.ndarray:
+    """Stage A probability averaged over the cross-fitted models."""
+    return np.mean([predict(m, df, A_FEATS) for m in models], axis=0).astype(np.float32)
+
+
+def prune(df: pl.DataFrame, models: list[lgb.Booster], tau: float, max_cands: int, p_a: np.ndarray | None = None) -> pl.DataFrame:
+    """Keep candidates with stage A probability >= tau, at most max_cands per S1. p_a overrides
+    the averaged prediction (out-of-fold scores for the S1 the stage A models were trained on)."""
+    df = df.with_columns(pl.Series("p_a", stage_a(df, models) if p_a is None else p_a))
     df = df.filter(pl.col("p_a") >= tau)
     return df.filter(pl.col("p_a").rank("ordinal", descending=True).over("s1_id") <= max_cands)
 

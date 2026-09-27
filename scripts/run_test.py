@@ -14,7 +14,7 @@ from ber.paths import INTERIM, OUTPUTS, ROOT
 
 MODELS = ROOT / "models"
 cfg = json.load(open(MODELS / "config.json"))
-model_a = lgb.Booster(model_file=str(MODELS / "stage_a.txt"))
+models_a = [lgb.Booster(model_file=str(f)) for f in sorted(MODELS.glob("stage_a*.txt"))]
 model_b = lgb.Booster(model_file=str(MODELS / "stage_b.txt"))
 
 recs = records("test")
@@ -29,7 +29,7 @@ if not all(p.exists() for p in blk_paths.values()):
 
 
 def score(pairs: pl.DataFrame) -> pl.DataFrame:
-    d = P.prune(P.cheap_features(pairs, stats), model_a, cfg["tau"], cfg["max_cands"])
+    d = P.prune(P.cheap_features(pairs, stats), models_a, cfg["tau"], cfg["max_cands"])
     P.log(f"pruned to {d.height} pairs")
     d = P.full_features(d, recs)
     d = d.with_columns(pl.Series("prob", P.predict(model_b, d, P.B_FEATS)))
