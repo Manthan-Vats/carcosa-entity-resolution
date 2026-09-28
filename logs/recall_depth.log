@@ -1,0 +1,50 @@
+US: 17348 true pairs
+  joint      @10   recall 0.9122
+  joint      @30   recall 0.9303
+  joint      @50   recall 0.9362
+  joint      @100  recall 0.9444
+  joint      @200  recall 0.9549
+  joint_num  @10   recall 0.8961
+  joint_num  @30   recall 0.9166
+  joint_num  @50   recall 0.9233
+  joint_num  @100  recall 0.9309
+  joint_num  @200  recall 0.9387
+  name       @10   recall 0.3523
+  name       @30   recall 0.4229
+  name       @50   recall 0.4502
+  name       @100  recall 0.4907
+  name       @200  recall 0.5385
+  name_heavy @10   recall 0.8604
+  name_heavy @30   recall 0.8817
+  name_heavy @50   recall 0.8877
+  name_heavy @100  recall 0.8954
+  name_heavy @200  recall 0.9038
+  ('joint', 30, 'joint_num', 10) recall 0.9330 cands/q 31.5
+  ('joint', 100, 'name_heavy', 50) recall 0.9633 cands/q 133.6
+  ('joint', 200, 'name_heavy', 100) recall 0.9681 cands/q 263.9
+  ('joint', 100, 'name', 50) recall 0.9630 cands/q 138.8
+India: 17190 true pairs
+  joint      @10   recall 0.8499
+  joint      @30   recall 0.8804
+  joint      @50   recall 0.8891
+  joint      @100  recall 0.9006
+  joint      @200  recall 0.9135
+  joint_num  @10   recall 0.8688
+  joint_num  @30   recall 0.8953
+  joint_num  @50   recall 0.9027
+  joint_num  @100  recall 0.9120
+  joint_num  @200  recall 0.9229
+  name       @10   recall 0.2306
+  name       @30   recall 0.3016
+  name       @50   recall 0.3400
+  name       @100  recall 0.3908
+  name       @200  recall 0.4372
+  name_heavy @10   recall 0.8243
+  name_heavy @30   recall 0.8557
+  name_heavy @50   recall 0.8677
+  name_heavy @100  recall 0.8810
+  name_heavy @200  recall 0.8959
+  ('joint', 30, 'joint_num', 10) recall 0.8910 cands/q 31.6
+  ('joint', 100, 'name_heavy', 50) recall 0.9198 cands/q 119.5
+  ('joint', 200, 'name_heavy', 100) recall 0.9304 cands/q 238.3
+  ('joint', 100, 'name', 50) recall 0.9187 cands/q 126.7

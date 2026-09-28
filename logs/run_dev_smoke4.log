@@ -1,0 +1,21 @@
+09:44:45 cheap features US: 470679 rows kept
+09:44:47 cheap features India: 291860 rows kept
+09:44:47 {"block_pairs_per_s1": 38.442371425064444, "block_recall": 0.9762342622718914}
+09:45:05 stage A half 1: 180 rounds
+09:46:16 stage A half 2: 173 rounds
+09:46:16 tau 0.00487
+09:46:39 pruned US: 120606 rows
+09:46:42 pruned India: 87246 rows
+09:47:00 stage B rows train 123798 valid 41361 f0 42693
+09:48:00 {
+ "f0_s1": 8147,
+ "block_pairs_per_s1": 38.442371425064444,
+ "block_recall": 0.9762342622718914,
+ "cand_pairs_per_s1": 5.2403338652264635,
+ "cand_recall": 0.9701867307964351,
+ "oracle_on_cands": 0.9886951927895856,
+ "tau": 0.004866336472332478,
+ "f05": 0.9809924924082891,
+ "f05_US": 0.984728847912399,
+ "f05_India": 0.9754905813594583
+}

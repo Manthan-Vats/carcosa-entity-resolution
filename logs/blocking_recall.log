@@ -1,0 +1,26 @@
+US name: 86s
+US addr: 39s
+US: queries 5000, pool 4949823, true pairs 17348
+  name@5   addr@0   recall 0.2878  cands/q 4.5
+  name@10  addr@0   recall 0.3523  cands/q 9.0
+  name@20  addr@0   recall 0.3988  cands/q 17.9
+  name@50  addr@0   recall 0.4499  cands/q 44.9
+  name@0   addr@10  recall 0.8076  cands/q 10.0
+  name@0   addr@50  recall 0.8824  cands/q 50.0
+  name@10  addr@5   recall 0.8210  cands/q 13.0
+  name@20  addr@10  recall 0.8870  cands/q 26.7
+  name@30  addr@20  recall 0.9143  cands/q 45.5
+  name@50  addr@50  recall 0.9355  cands/q 93.2
+India name: 73s
+India addr: 48s
+India: queries 5000, pool 3306824, true pairs 17190
+  name@5   addr@0   recall 0.1826  cands/q 4.0
+  name@10  addr@0   recall 0.2305  cands/q 7.9
+  name@20  addr@0   recall 0.2732  cands/q 15.8
+  name@50  addr@0   recall 0.3356  cands/q 39.6
+  name@0   addr@10  recall 0.7562  cands/q 10.0
+  name@0   addr@50  recall 0.8205  cands/q 49.6
+  name@10  addr@5   recall 0.7531  cands/q 12.3
+  name@20  addr@10  recall 0.8233  cands/q 24.9
+  name@30  addr@20  recall 0.8539  cands/q 42.6
+  name@50  addr@50  recall 0.8791  cands/q 88.1

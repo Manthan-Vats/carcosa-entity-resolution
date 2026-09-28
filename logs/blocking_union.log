@@ -1,0 +1,20 @@
+US: pool 4949823, empty-address 0.036
+  joint@15               recall 0.9208  cands/q 15.0
+  joint@15 + empty@5     recall 0.9453  cands/q 19.5
+  joint@15 + empty@10    recall 0.9478  cands/q 24.0
+  joint@30               recall 0.9303  cands/q 30.0
+  joint@30 + empty@5     recall 0.9544  cands/q 34.5
+  joint@30 + empty@10    recall 0.9569  cands/q 39.0
+  joint@50               recall 0.9362  cands/q 50.0
+  joint@50 + empty@5     recall 0.9588  cands/q 54.5
+  joint@50 + empty@10    recall 0.9614  cands/q 58.9
+India: pool 3306824, empty-address 0.030
+  joint@15               recall 0.8628  cands/q 15.0
+  joint@15 + empty@5     recall 0.8809  cands/q 18.7
+  joint@15 + empty@10    recall 0.8835  cands/q 22.4
+  joint@30               recall 0.8806  cands/q 29.9
+  joint@30 + empty@5     recall 0.8970  cands/q 33.6
+  joint@30 + empty@10    recall 0.8997  cands/q 37.3
+  joint@50               recall 0.8891  cands/q 49.9
+  joint@50 + empty@5     recall 0.9042  cands/q 53.5
+  joint@50 + empty@10    recall 0.9068  cands/q 57.2

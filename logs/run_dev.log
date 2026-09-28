@@ -1,0 +1,31 @@
+11:35:21 blocked US: 1058909 queries, 4949823 pool, 15883480 pairs
+11:41:26 blocked India: 706554 queries, 3306824 pool, 10586588 pairs
+11:41:27 blocked pairs 26470068
+11:41:50 stage A rows train 5997675 valid 1998921 f0 5294075
+[200]	valid_0's binary_logloss: 0.0976554
+[400]	valid_0's binary_logloss: 0.0959942
+[600]	valid_0's binary_logloss: 0.0949326
+[800]	valid_0's binary_logloss: 0.0944688
+11:43:40 tau 0.04114
+11:45:53 stage B rows train 1707842 valid 569923 f0 1506636
+[200]	valid_0's binary_logloss: 0.0853516
+[400]	valid_0's binary_logloss: 0.0764659
+[600]	valid_0's binary_logloss: 0.0734451
+[800]	valid_0's binary_logloss: 0.0715916
+[1000]	valid_0's binary_logloss: 0.0703174
+[1200]	valid_0's binary_logloss: 0.0695672
+[1400]	valid_0's binary_logloss: 0.0689042
+[1600]	valid_0's binary_logloss: 0.068403
+[1800]	valid_0's binary_logloss: 0.0681069
+[2000]	valid_0's binary_logloss: 0.0678157
+11:47:59 {
+ "f0_s1": 353091,
+ "block_pairs_per_s1": 14.993514419795464,
+ "block_recall": 0.8924763561559095,
+ "cand_pairs_per_s1": 4.266990662463784,
+ "cand_recall": 0.8881182625886388,
+ "tau": 0.04114348441362381,
+ "f05": 0.9363574448563377,
+ "f05_US": 0.9530919807560313,
+ "f05_India": 0.9112774310752824
+}

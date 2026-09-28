@@ -1,0 +1,12 @@
+US name<=0.005 addr<=0.005: recall 0.9540 cands/q 42.4  9.3 ms/query
+US name<=0.01 addr<=0.05: recall 0.9731 cands/q 43.2  29.7 ms/query
+US name<=0.02 addr<=0.05: recall 0.9781 cands/q 43.9  50.2 ms/query
+US name<=0.02 addr<=0.1: recall 0.9785 cands/q 43.7  59.5 ms/query
+US name<=0.05 addr<=0.05: recall 0.9816 cands/q 44.3  86.6 ms/query
+US name<=0.05 addr<=0.2: recall 0.9821 cands/q 44.2  80.4 ms/query
+India name<=0.005 addr<=0.005: recall 0.9008 cands/q 38.6  5.4 ms/query
+India name<=0.01 addr<=0.05: recall 0.9566 cands/q 38.8  21.1 ms/query
+India name<=0.02 addr<=0.05: recall 0.9708 cands/q 41.9  33.7 ms/query
+India name<=0.02 addr<=0.1: recall 0.9727 cands/q 41.6  48.3 ms/query
+India name<=0.05 addr<=0.05: recall 0.9784 cands/q 43.2  55.7 ms/query
+India name<=0.05 addr<=0.2: recall 0.9792 cands/q 42.8  77.2 ms/query
