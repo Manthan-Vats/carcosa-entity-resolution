@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entity Resolution Study</title>
+<meta name="description" content="Predictive modeling for business entity resolution: logistic regression, LDA, QDA, LightGBM and count models on the Amazon ML Challenge 2026 data.">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f0efec; --border: #e1e0db;
+  --text: #1b1b19; --text-2: #52514e; --muted: #7a7974;
+  --accent: #2a78d6; --accent-soft: #e6effa;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #6250d6;
+  --good: #1a7f37; --good-soft: #e3f4e8; --bad: #c62828; --bad-soft: #fbe7e7;
+  --bar: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #34332f;
+    --text: #f0efec; --text-2: #c3c2b7; --muted: #94938b;
+    --accent: #3987e5; --accent-soft: #1d2b3d;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #9085e9;
+    --good: #4cc26b; --good-soft: #17301f; --bad: #ef6b6b; --bad-soft: #3a1c1c;
+    --bar: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #34332f;
+  --text: #f0efec; --text-2: #c3c2b7; --muted: #94938b;
+  --accent: #3987e5; --accent-soft: #1d2b3d;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #9085e9;
+  --good: #4cc26b; --good-soft: #17301f; --bad: #ef6b6b; --bad-soft: #3a1c1c;
+  --bar: #3987e5;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 28px 0 0; }
+h1 { font-size: 26px; line-height: 1.25; margin: 0 0 6px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 28px 0 10px; }
+h3 { font-size: 15px; margin: 20px 0 8px; }
+.sub { color: var(--text-2); margin: 0; }
+.links { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text); text-decoration: none; font-size: 14px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+nav { display: flex; gap: 2px; overflow-x: auto; }
+nav button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; font: inherit; font-size: 14px;
+  color: var(--text-2); cursor: pointer; white-space: nowrap; }
+nav button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+main { padding: 8px 0 48px; }
+section[hidden] { display: none; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 20px 0; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.tile .k { color: var(--text-2); font-size: 13px; }
+.tile .v { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .n { color: var(--muted); font-size: 12.5px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin: 14px 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+figure { margin: 0; }
+figure img { width: 100%; height: auto; background: #fff; border-radius: 6px; display: block; }
+figcaption { color: var(--text-2); font-size: 13px; margin-top: 8px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--text-2); font-weight: 600; font-size: 12.5px; background: var(--surface-2); }
+td.num, th.num { text-align: right; }
+tr.best td { font-weight: 650; }
+ol.steps { padding-left: 20px; margin: 8px 0; }
+ol.steps li { margin: 4px 0; }
+.note { color: var(--text-2); font-size: 13.5px; }
+code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+/* chart */
+.chart { position: relative; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--text-2); font-size: 12px; }
+.chart .grid line { stroke: var(--border); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-2); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; font-size: 12.5px; box-shadow: 0 4px 14px rgba(0,0,0,.12); opacity: 0; transition: opacity .1s; white-space: nowrap; }
+/* explorer */
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); color: var(--text-2); padding: 6px 12px; font: inherit; font-size: 13.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+select, input[type="search"] { font: inherit; font-size: 14px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text); max-width: 100%; }
+.explorer { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; }
+.explorer > * { min-width: 0; }
+@media (max-width: 900px) { .explorer { grid-template-columns: minmax(0, 1fr); } .list { max-height: 300px; } }
+main, section, .card { min-width: 0; }
+.grid2 > * { min-width: 0; }
+.list { max-height: 560px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.list button { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--border); background: none;
+  padding: 8px 12px; font: inherit; font-size: 13.5px; color: var(--text); cursor: pointer; }
+.list button:hover { background: var(--surface-2); }
+.list button[aria-current="true"] { background: var(--accent-soft); }
+.list small { color: var(--muted); display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ent h3 { margin: 0 0 2px; font-size: 17px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.chip { font-size: 12.5px; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; }
+.badge.ok { background: var(--good-soft); color: var(--good); }
+.badge.no { background: var(--bad-soft); color: var(--bad); }
+.badge.sel { background: var(--accent-soft); color: var(--accent); }
+.pbar { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+.pbar span.track { flex: 1; height: 6px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.pbar span.fill { display: block; height: 100%; background: var(--bar); border-radius: 4px; }
+td .nm { font-weight: 550; }
+td .ad { color: var(--text-2); font-size: 12.5px; }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); padding: 18px 0 30px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Predicting Cross-Source Matches of Noisy Business Records</h1>
+    <p class="sub">Predictive Analytics course project · Manthan Vats (2427030314) · Peddi Reddy Srikar Reddy (2427030741) · Manipal University Jaipur</p>
+    <div class="links">
+      <a class="btn" href="paper.pdf" target="_blank" rel="noopener">📄 Research paper (PDF)</a>
+      <a class="btn" id="lnk-nb" href="#" target="_blank" rel="noopener">📓 Notebook</a>
+      <a class="btn" id="lnk-repo" href="#" target="_blank" rel="noopener">💻 GitHub repository</a>
+      <button class="btn" id="theme" type="button" aria-label="Toggle dark mode">◐ Theme</button>
+    </div>
+    <nav role="tablist" id="tabs">
+      <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+      <button role="tab" data-tab="data">Data &amp; EDA</button>
+      <button role="tab" data-tab="models">Model comparison</button>
+      <button role="tab" data-tab="counts">Count models</button>
+      <button role="tab" data-tab="explorer">Match explorer</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <div class="tiles" id="kpis"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3 style="margin-top:0">The task</h3>
+        <p>Records of the same business arrive from three sources with different spellings, abbreviations, word order,
+          Devanagari script and missing address parts, and they share no identifier. For every Source 1 record we
+          predict which Source 2/3 records describe the same business. Data: Amazon ML Challenge 2026 (US and India).</p>
+        <p class="note">This dashboard shows the course study, which uses a 5% stratified sample of the training data. The test set is
+          the lockbox split, which was never used for training or tuning.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Pipeline</h3>
+        <ol class="steps">
+          <li><b>Normalisation</b>: lower-casing, transliteration of Devanagari, house-number extraction</li>
+          <li><b>Blocking</b>: TF-IDF cosine search narrows the pool to ~50 candidates per entity</li>
+          <li><b>Pair features</b>: 43 similarity, context and record features</li>
+          <li><b>Classification</b>: logistic regression, LDA, QDA, LightGBM predict P(match)</li>
+          <li><b>Decision</b>: per entity, accept the candidates that maximise expected F0.5</li>
+          <li><b>Count models</b>: Poisson, negative binomial, multinomial logit for the number of matches</li>
+        </ol>
+      </div>
+    </div>
+    <h2>Full challenge system (all data)</h2>
+    <p class="note">The same features in a two-stage LightGBM system, trained on all 1.76M development entities and submitted to the challenge.</p>
+    <div class="card tablewrap"><table id="t-challenge"></table></div>
+  </section>
+
+  <!-- DATA -->
+  <section id="data" hidden>
+    <h2>Data quality by source and country</h2>
+    <div class="card tablewrap"><table id="t-quality"></table></div>
+    <div class="grid2">
+      <div class="card"><figure><img src="figures/fig_match_counts.png" alt="Bar chart of true matches per entity for US and India; the mode is 3 matches" loading="lazy">
+        <figcaption>True matches per Source 1 entity. Mean <span id="c-mean"></span>, variance <span id="c-var"></span>.</figcaption></figure></div>
+      <div class="card"><figure><img src="figures/fig_corr.png" alt="Correlation heatmap of the 43 pair features" loading="lazy">
+        <figcaption id="fs-cap">Feature correlations, used for feature selection.</figcaption></figure></div>
+    </div>
+    <div class="card"><figure><img src="figures/fig_feature_dist.png" alt="Histograms of name cosine, address cosine and name token-set ratio for matches and non-matches" loading="lazy">
+      <figcaption>Similarity features for matching and non-matching candidate pairs. Many non-matches share the exact name (chains, common names); address similarity separates the classes better.</figcaption></figure></div>
+  </section>
+
+  <!-- MODELS -->
+  <section id="models" hidden>
+    <h2>Challenge metric: entity-level macro F0.5 on the lockbox</h2>
+    <div class="card">
+      <div class="legend" id="lg-f05"></div>
+      <div class="chart" id="ch-f05"><div class="tip"></div></div>
+      <p class="note" id="ceil"></p>
+    </div>
+    <h2>Pair-level metrics on the lockbox</h2>
+    <div class="card tablewrap"><table id="t-pairs"></table></div>
+    <div class="card"><figure><img src="figures/fig_roc_pr.png" alt="ROC and precision-recall curves for the four models" loading="lazy">
+      <figcaption>ROC curves (log-scaled false positive rate) and precision-recall curves.</figcaption></figure></div>
+    <h2>Hyperparameter tuning (5-fold grouped cross-validation)</h2>
+    <div class="card tablewrap"><table id="t-tuning"></table></div>
+    <div class="grid2">
+      <div class="card"><figure><img src="figures/fig_logit_coef.png" alt="Logistic regression coefficients with confidence intervals" loading="lazy">
+        <figcaption>Logistic regression coefficients on standardised features with 95% Wald intervals. Pseudo-R² <span id="r2"></span>.</figcaption></figure></div>
+      <div class="card"><figure><img src="figures/fig_overfit.png" alt="Training and validation curves showing overfitting" loading="lazy">
+        <figcaption>Overfitting: validation log-loss is lowest at round <span id="best-round"></span> and rises after; a decision tree peaks at depth 8 and overfits beyond it.</figcaption></figure></div>
+    </div>
+  </section>
+
+  <!-- COUNTS -->
+  <section id="counts" hidden>
+    <h2>How many matches does an entity have?</h2>
+    <div class="tiles" id="count-kpis"></div>
+    <div class="card tablewrap"><table id="t-counts"></table></div>
+    <div class="card">
+      <p>The match counts are <b>under-dispersed</b>: their variance is smaller than their mean, while a Poisson model assumes the two are equal.
+        The negative binomial model can only add variance, so its dispersion parameter goes to zero and it gives the same fit as Poisson.
+        Treating the count as a category (multinomial logit over 0/1/2/3+) is more accurate.</p>
+      <p id="cg"></p>
+    </div>
+  </section>
+
+  <!-- EXPLORER -->
+  <section id="explorer" hidden>
+    <h2>Match explorer</h2>
+    <p class="note">Pick a held-out Source 1 business from the lockbox. The table lists its candidates from blocking with each model's match
+      probability, the candidates the expected-F0.5 rule accepts, and the true answer. The top 8 candidates of each model and every true match are shown.</p>
+    <div class="controls">
+      <div class="seg" id="seg-country" role="group" aria-label="Country">
+        <button type="button" data-v="US" aria-pressed="true">US</button>
+        <button type="button" data-v="India" aria-pressed="false">India</button>
+      </div>
+      <label>Model <select id="sel-model"></select></label>
+      <label><input type="checkbox" id="only-matched" checked> Only entities with a true match</label>
+      <input type="search" id="q" placeholder="Search by name…" aria-label="Search entities">
+    </div>
+    <div class="explorer">
+      <div class="list" id="ent-list" role="listbox" aria-label="Entities"></div>
+      <div>
+        <div class="card ent" id="ent-card"></div>
+        <div class="card tablewrap"><table id="t-cands"></table></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">Data: Amazon ML Challenge 2026 training set (business entity resolution). Only a 1,500-entity demo sample is included here.
+    Built from the outputs of <code>notebooks/predictive_modeling.ipynb</code>.</div>
+</footer>
+
+<script src="data.js"></script>
+<script>
+const REPO = "https://github.com/Manthan-Vats/carcosa-entity-resolution";
+document.getElementById("lnk-repo").href = REPO;
+document.getElementById("lnk-nb").href = REPO + "/blob/main/notebooks/predictive_modeling.ipynb";
+
+const D = window.DATA, R = D.results, M = D.models;
+const NAMES = { LR: "Logistic regression", LDA: "LDA", QDA: "QDA", LightGBM: "LightGBM" };
+const f = (x, d = 4) => (x === null || x === undefined || Number.isNaN(x)) ? "–" : Number(x).toFixed(d);
+const int = x => Number(x).toLocaleString("en-US");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// theme toggle
+try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+document.getElementById("theme").onclick = () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("theme", next); } catch (e) {}
+  drawF05();
+};
+
+// tabs
+const tabs = [...document.querySelectorAll("#tabs button")];
+function show(id) {
+  tabs.forEach(b => b.setAttribute("aria-selected", b.dataset.tab === id));
+  document.querySelectorAll("main > section").forEach(s => s.hidden = s.id !== id);
+  if (id === "models") drawF05();
+  try { history.replaceState(null, "", "#" + id); } catch (e) {}
+}
+tabs.forEach(b => b.onclick = () => show(b.dataset.tab));
+
+function table(el, head, rows, numCols = [], bestRow = -1) {
+  const th = head.map((h, i) => `<th class="${numCols.includes(i) ? "num" : ""}">${h}</th>`).join("");
+  const tr = rows.map((r, j) => `<tr class="${j === bestRow ? "best" : ""}">` +
+    r.map((c, i) => `<td class="${numCols.includes(i) ? "num" : ""}">${c}</td>`).join("") + "</tr>").join("");
+  document.getElementById(el).innerHTML = `<thead><tr>${th}</tr></thead><tbody>${tr}</tbody>`;
+}
+
+// overview
+const em = R.entity_metrics, topRule = em.filter(r => r.rule === "expected-F0.5 top-k");
+const best = topRule.reduce((a, b) => a.macro_f05 > b.macro_f05 ? a : b);
+const lr = topRule.find(r => r.model === "LR");
+document.getElementById("kpis").innerHTML = [
+  ["Best macro F0.5 (lockbox)", f(best.macro_f05), `${best.model}, expected-F0.5 rule`],
+  ["Logistic regression", f(lr.macro_f05), "interpretable runner-up"],
+  ["Candidate pairs scored", int(R.data.pairs), `${f(R.data.pairs_per_s1, 1)} per entity, ${f(100 * R.data.pos_rate, 1)}% matches`],
+  ["Blocking recall", f(100 * R.data.blocking_recall, 1) + "%", `${int(R.data.s1)} entities, ${int(R.data.records)} records`],
+].map(([k, v, n]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+
+const chDesc = { r001: "TF-IDF top-15, LightGBM prune + pair model", r002: "union blocking, transliteration, sibling features",
+  r003: "r002 with stage B on more data", r004: "name-word view, cross-fitted stage A" };
+table("t-challenge", ["Run", "Change", "Dev F0.5", "Recall ceiling", "Candidates / entity", "Public leaderboard"],
+  R.challenge_runs.map(r => [r.run_id, chDesc[r.run_id] || "", f(r.f05), f(r.recall_ceiling), f(r.avg_candidates, 2), r.portal ? f(r.portal, 3) : "–"]),
+  [2, 3, 4, 5], R.challenge_runs.length - 1);
+
+// data
+table("t-quality", ["Source", "Country", "Empty address", "Devanagari names", "Median name length", "99th pct name length"],
+  R.quality.map(q => ["S" + q.src, q.country, f(100 * q.addr_missing, 1) + "%", f(100 * q.indic_script, 1) + "%", q.name_len_median, q.name_len_p99]),
+  [2, 3, 4, 5]);
+document.getElementById("c-mean").textContent = f(R.count_stats.mean, 2);
+document.getElementById("c-var").textContent = f(R.count_stats.var, 2);
+const fs = R.feature_selection;
+document.getElementById("fs-cap").textContent = `Feature correlations. ${fs.all - fs.kept} of ${fs.all} features were dropped for LR/LDA/QDA because |r| > 0.95 with a kept feature: ${fs.dropped.join(", ")}.`;
+
+// models
+const pm = R.pair_metrics;
+const bestPair = pm.reduce((a, b) => a.pr_auc > b.pr_auc ? a : b);
+table("t-pairs", ["Model", "AUC-ROC", "PR-AUC", "F1", "Precision", "Recall", "Log-loss", "Brier", "False pos.", "False neg."],
+  pm.map(r => [NAMES[r.model], f(r.auc_roc), f(r.pr_auc), f(r.f1), f(r.precision), f(r.recall), f(r.log_loss), f(r.brier), int(r.fp), int(r.fn)]),
+  [1, 2, 3, 4, 5, 6, 7, 8, 9], pm.indexOf(bestPair));
+const short = (m, p) => m === "LR" ? `C = ${p.C}, class weights: ${p.class_weight || "none"}` :
+  m === "LDA" ? `shrinkage: ${p.shrinkage ?? "none"}` : m === "QDA" ? `reg. param = ${p.reg_param}` :
+  `${p.num_leaves} leaves, learning rate ${f(p.learning_rate, 3)}, min leaf ${p.min_child_samples}`;
+table("t-tuning", ["Model", "Search", "Selected setting", "CV average precision"],
+  M.map(m => [NAMES[m], m === "LightGBM" ? "random (10 draws)" : "grid", short(m, R.tuning[m].best_params),
+    `${f(R.tuning[m].cv_ap_mean)} ± ${f(R.tuning[m].cv_ap_std)}`]), [3]);
+document.getElementById("r2").textContent = f(R.logit.pseudo_r2, 3);
+document.getElementById("best-round").textContent = R.overfit.best_round;
+document.getElementById("ceil").textContent = `Ceiling with a perfect classifier on the blocked candidates: ${f(R.entity_ceiling)}. The expected-F0.5 rule adapts the number of accepted candidates per entity.`;
+
+const RULES = [["0.5 threshold", "p ≥ 0.5", "--s1"], ["F1 threshold", "F1-optimal threshold", "--s2"], ["expected-F0.5 top-k", "expected-F0.5 rule", "--s3"]];
+document.getElementById("lg-f05").innerHTML = RULES.map(([, l, c]) => `<span><i style="background:var(${c})"></i>${l}</span>`).join("");
+function drawF05() {
+  const box = document.getElementById("ch-f05"), tip = box.querySelector(".tip");
+  const W = 760, H = 300, L = 48, B = 34, T = 10, lo = 0.94, hi = 1.0;
+  const y = v => T + (H - T - B) * (1 - (Math.max(v, lo) - lo) / (hi - lo));
+  const gw = (W - L) / M.length, bw = Math.min(30, (gw - 30) / 3);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Macro F0.5 by model and decision rule"><g class="grid">`;
+  for (let v = lo; v <= hi + 1e-9; v += 0.01) s += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v.toFixed(2)}</text>`;
+  s += "</g>";
+  M.forEach((m, i) => {
+    const x0 = L + i * gw + (gw - 3 * bw - 8) / 2;
+    RULES.forEach(([rule, label, c], j) => {
+      const r = em.find(e => e.model === m && e.rule === rule), x = x0 + j * (bw + 4), yy = y(r.macro_f05);
+      s += `<path d="M${x},${H - B} V${yy + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${H - B} Z" fill="var(${c})"
+        data-t="${NAMES[m]} · ${label}<br><b>${f(r.macro_f05)}</b> (US ${f(r.f05_US)}, India ${f(r.f05_India)})"/>`;
+      s += `<rect x="${x - 2}" y="${T}" width="${bw + 4}" height="${H - B - T}" fill="transparent" data-t="${NAMES[m]} · ${label}<br><b>${f(r.macro_f05)}</b> (US ${f(r.f05_US)}, India ${f(r.f05_India)})"/>`;
+    });
+    s += `<text x="${L + i * gw + gw / 2}" y="${H - 12}" text-anchor="middle">${NAMES[m]}</text>`;
+  });
+  s += `<line x1="${L}" x2="${W}" y1="${H - B}" y2="${H - B}" stroke="var(--muted)"/></svg>`;
+  box.innerHTML = s; box.appendChild(tip);
+  box.querySelectorAll("[data-t]").forEach(el => {
+    el.addEventListener("mousemove", ev => {
+      const rb = box.getBoundingClientRect();
+      tip.innerHTML = el.dataset.t; tip.style.opacity = 1;
+      tip.style.left = Math.min(ev.clientX - rb.left + 12, rb.width - tip.offsetWidth) + "px";
+      tip.style.top = (ev.clientY - rb.top - 44) + "px";
+    });
+    el.addEventListener("mouseleave", () => tip.style.opacity = 0);
+  });
+}
+const lowNote = document.createElement("p");
+lowNote.className = "note"; lowNote.textContent = "The axis starts at 0.94 so that the differences are visible; hover a bar for exact values.";
+document.getElementById("ceil").after(lowNote);
+
+// counts
+const cm = R.count_models;
+document.getElementById("count-kpis").innerHTML = [
+  ["Mean matches per entity", f(R.count_stats.mean, 2), `variance ${f(R.count_stats.var, 2)}`],
+  ["Poisson Pearson dispersion", f(cm.pearson_dispersion, 2), "1.0 if the Poisson assumption held"],
+  ["Negative binomial α", Number(cm.nb_alpha).toExponential(1), "collapses to Poisson"],
+].map(([k, v, n]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+table("t-counts", ["Model", "AIC", "MAE", "RMSE", "Accuracy on 0/1/2/3+"],
+  cm.table.map(r => [r.model, int(Math.round(r.aic)), f(r.mae, 3), f(r.rmse, 3), f(r.class_acc_0123, 3)]), [1, 2, 3, 4], 2);
+document.getElementById("cg").innerHTML = `Using the predicted count as the decision (accept the top round(μ) candidates of ${R.count_guided_f05.model}) gives macro F0.5
+  <b>${f(R.count_guided_f05.macro_f05)}</b>, well below the expected-F0.5 rule (${f(best.macro_f05)}).`;
+
+// explorer
+const C = { id: 0, name: 1, addr: 2, y: 3, p: 4, sel: 8, ncos: 12, acos: 13, tset: 14 };
+const st = { country: "US", model: "LightGBM", only: true, q: "", cur: null };
+const selModel = document.getElementById("sel-model");
+selModel.innerHTML = M.map(m => `<option value="${m}" ${m === st.model ? "selected" : ""}>${NAMES[m]}</option>`).join("");
+selModel.onchange = () => { st.model = selModel.value; renderEnt(); };
+document.querySelectorAll("#seg-country button").forEach(b => b.onclick = () => {
+  st.country = b.dataset.v; st.cur = null;
+  document.querySelectorAll("#seg-country button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderList();
+});
+document.getElementById("only-matched").onchange = e => { st.only = e.target.checked; st.cur = null; renderList(); };
+document.getElementById("q").oninput = e => { st.q = e.target.value.toLowerCase(); renderList(); };
+
+function pool() {
+  return D.entities.filter(e => e.country === st.country && (!st.only || e.n_true > 0) && (!st.q || e.name.toLowerCase().includes(st.q)));
+}
+function renderList() {
+  const ents = pool(), list = document.getElementById("ent-list");
+  if (!st.cur || !ents.includes(st.cur)) st.cur = ents[0] || null;
+  list.innerHTML = ents.slice(0, 400).map((e, i) =>
+    `<button type="button" data-i="${D.entities.indexOf(e)}" aria-current="${e === st.cur}">${esc(e.name)}<small>${esc(e.addr) || "no address"}</small></button>`).join("")
+    + (ents.length > 400 ? `<div class="note" style="padding:8px 12px">${ents.length - 400} more, refine the search</div>` : "")
+    + (ents.length === 0 ? `<div class="note" style="padding:8px 12px">No entities match.</div>` : "");
+  list.querySelectorAll("button").forEach(b => b.onclick = () => { st.cur = D.entities[+b.dataset.i]; renderList(); });
+  renderEnt();
+}
+function renderEnt() {
+  const e = st.cur, card = document.getElementById("ent-card"), tbl = document.getElementById("t-cands");
+  if (!e) { card.innerHTML = "<p class='note'>Pick an entity.</p>"; tbl.innerHTML = ""; return; }
+  const mi = M.indexOf(st.model);
+  const rows = [...e.cands].sort((a, b) => b[C.p + mi] - a[C.p + mi]);
+  const sel = rows.filter(r => r[C.sel + mi]), tp = sel.filter(r => r[C.y]).length;
+  card.innerHTML = `<h3>${esc(e.name)}</h3><div class="note">${esc(e.addr) || "<i>no address</i>"} · ${e.id} · ${e.country}</div>
+    <div class="chips"><span class="chip">${e.n_cand} candidates from blocking</span><span class="chip">${e.n_true} true match${e.n_true === 1 ? "" : "es"}</span>
+    <span class="chip">${NAMES[st.model]} accepts ${e.k[st.model]}</span><span class="chip">correct ${tp}</span>
+    <span class="chip">wrong ${sel.length - tp}</span><span class="chip">missed ${e.n_true - tp}</span></div>`;
+  const others = M.filter(m => m !== st.model);
+  tbl.innerHTML = `<thead><tr><th>Candidate record</th><th>P(match), ${NAMES[st.model]}</th><th>Accepted</th><th>Truth</th>
+    ${others.map(m => `<th class="num">${m}</th>`).join("")}<th class="num">Name cos</th><th class="num">Addr cos</th><th class="num">Name token-set</th></tr></thead><tbody>` +
+    rows.map(r => {
+      const p = r[C.p + mi];
+      return `<tr><td><div class="nm">${esc(r[C.name])}</div><div class="ad">${esc(r[C.addr]) || "<i>no address</i>"} · ${r[C.id]}</div></td>
+      <td><div class="pbar"><span class="track"><span class="fill" style="width:${(100 * p).toFixed(1)}%"></span></span>${f(p, 3)}</div></td>
+      <td>${r[C.sel + mi] ? '<span class="badge sel">accepted</span>' : ""}</td>
+      <td>${r[C.y] ? '<span class="badge ok">match</span>' : '<span class="badge no">no</span>'}</td>
+      ${others.map(m => `<td class="num">${f(r[C.p + M.indexOf(m)], 3)}</td>`).join("")}
+      <td class="num">${f(r[C.ncos], 2)}</td><td class="num">${f(r[C.acos], 2)}</td><td class="num">${r[C.tset]}</td></tr>`;
+    }).join("") + "</tbody>";
+}
+renderList();
+const h = location.hash.slice(1);
+if (["overview", "data", "models", "counts", "explorer"].includes(h)) show(h);
+window.scrollTo(0, 0);
+</script>
+</body>
+</html>

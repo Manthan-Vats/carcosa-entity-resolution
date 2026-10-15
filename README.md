@@ -1,7 +1,7 @@
 # Predictive Modeling for Business Entity Resolution
 
 Course project, **Predictive Analytics**
-Manthan Vats (2427030314) · Peddi Reddy Srikar Reddy (2427030741)
+Manthan Vats (2427030314) · Peddi Reddy Srikar Reddy (2427030741) · Manipal University Jaipur
 
 Business records about the same company arrive from three sources with different spellings,
 abbreviations, scripts (Latin and Devanagari) and missing address parts, and no shared ID.
@@ -15,8 +15,8 @@ repository was our team's entry (public leaderboard macro F0.5 = 0.959).
 |---|---|
 | Research paper (IEEE, 7 pages) | [`paper/main.pdf`](paper/main.pdf) |
 | Notebook with all outputs | [`notebooks/predictive_modeling.ipynb`](notebooks/predictive_modeling.ipynb) |
-| Live dashboard | DASHBOARD_LINK |
-| Dashboard source | [`app/app.py`](app/app.py) |
+| **Live dashboard** (opens in the browser, nothing to install) | **[https://manthan-vats.github.io/carcosa-entity-resolution/](https://manthan-vats.github.io/carcosa-entity-resolution/)** |
+| Dashboard source | [`site/index.html`](site/index.html), built by [`scripts/study/build_site.py`](scripts/study/build_site.py) |
 | Result tables | [`reports/`](reports/) |
 
 The course study recasts the problem as a set of predictive models from the syllabus:
@@ -37,7 +37,8 @@ The course study recasts the problem as a set of predictive models from the syll
 ```
 notebooks/predictive_modeling.ipynb   the full study, executed with outputs (start here)
 notebooks/predictive_modeling.py      the same notebook as a plain script (# %% cells)
-app/app.py                            Streamlit dashboard (results + match explorer)
+site/                                 static dashboard published on GitHub Pages
+app/app.py                            the same dashboard as a Streamlit app (local)
 paper/                                IEEE two-column paper (LaTeX source, figures, PDF)
 reports/                              every table the paper reports (CSV / JSON)
 scripts/study/build_study_data.py     builds the 5% study dataset (sample -> blocking -> features)
@@ -55,7 +56,8 @@ Python 3.12. Install dependencies:
 pip install -r requirements.txt
 ```
 
-**Dashboard only** (uses the small demo files shipped in `app/`):
+**Dashboard**: open the live link above. To run it locally instead, either open `site/index.html` through any static server
+(`python -m http.server -d site`) or run the Streamlit version, which uses the small demo files in `app/`:
 
 ```bash
 streamlit run app/app.py
@@ -67,6 +69,7 @@ streamlit run app/app.py
    (or copy the cached `data/interim/train_records_norm.parquet` and `train_gt_pairs.parquet`).
 2. `python scripts/study/build_study_data.py` (about 3 minutes on 16 threads) writes `data/study/`.
 3. Run `notebooks/predictive_modeling.ipynb` top to bottom. It writes `reports/`, `paper/figures/` and `app/`.
+4. `python scripts/study/build_site.py` refreshes the dashboard data in `site/`.
 
 **Full challenge system** (several hours on a 16-thread laptop): see `docs/package/README.md`.
 
