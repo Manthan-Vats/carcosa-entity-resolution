@@ -17,7 +17,7 @@ from ber.decide import expected_f05_topk
 
 SITE = ROOT / "site"
 MODELS = ["LR", "LDA", "QDA", "LightGBM"]
-KEEP_TOP = 8  # candidates shown per entity: top-8 of any model, plus every true match
+KEEP_TOP = 8  # candidates shown per entity: top-8 of any model, every accepted candidate and every true match
 
 (SITE / "figures").mkdir(parents=True, exist_ok=True)
 for f in (ROOT / "paper" / "figures").glob("*.png"):
@@ -39,7 +39,7 @@ for (s1,), g in pairs.group_by("s1_id", maintain_order=True):
         g = g.with_columns(pl.Series(f"sel_{m}", [i in top for i in range(g.height)]))
         k[m] = len(top)
     ranks = [g[f"p_{m}"].rank("ordinal", descending=True) for m in MODELS]
-    keep = (pl.min_horizontal(ranks) <= KEEP_TOP) | (g["y"] == 1)
+    keep = (pl.min_horizontal(ranks) <= KEEP_TOP) | (g["y"] == 1) | pl.any_horizontal([g[f"sel_{m}"] for m in MODELS])
     g = g.filter(keep).sort("p_LightGBM", descending=True)
     cands = [[c, *text.get(c, ["", ""]), int(y), *[round(float(x), 4) for x in ps], *[int(s) for s in sel],
               round(float(nc), 3), round(float(ac), 3), int(round(float(ts)))]
