@@ -1,0 +1,15 @@
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Count models for the number of matches per entity (lockbox). The multinomial logit predicts capped classes, so its MAE/RMSE are on the 0--3 scale}
+\label{tab:counts}
+\begin{tabular}{lrrrr}
+\toprule
+Model & AIC & MAE & RMSE & Acc. (0/1/2/3+) \\
+\midrule
+Poisson GLM & 288,006 & 0.713 & 0.949 & 0.763 \\
+Negative binomial & 288,008 & 0.713 & 0.949 & 0.763 \\
+Multinomial logit & 77,703 & 0.211 & 0.506 & 0.808 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,16 @@
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Hyperparameter search with 5-fold grouped cross-validation}
+\label{tab:tuning}
+\begin{tabular}{llll}
+\toprule
+Model & Search & Selected setting & CV AP (mean $\pm$ sd) \\
+\midrule
+LR & grid & $C=1$, weights: none & 0.9974 $\pm$ 0.0001 \\
+LDA & grid & shrinkage: none & 0.9857 $\pm$ 0.0009 \\
+QDA & grid & reg. param $=0.1$ & 0.9917 $\pm$ 0.0004 \\
+LightGBM & random & 85 leaves, lr 0.052 & 0.9991 $\pm$ 0.0001 \\
+\bottomrule
+\end{tabular}
+\end{table}

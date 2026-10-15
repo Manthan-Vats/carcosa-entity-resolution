@@ -1,0 +1,170 @@
+\section{Experiments and Results}
+\subsection{Setup}
+Blocking on the study sample returned 5.80 million candidate pairs, 52.5 per entity, and kept 99.4\% of the true
+matches. Positives make up 6.5\% of the pairs. The final models are trained on 2.78M pairs (52,967 entities in
+f1--f3), validated on 0.93M pairs (f4) and tested on 1.14M pairs from 21,685 lockbox entities. The correlation filter
+removed five of the 43 features for the linear and discriminant models (address token-sort and partial ratio, the
+candidate address length, first-number agreement, and one gap feature). Everything ran on a 16-thread laptop CPU;
+the tuning stage took 19 minutes and the largest single fit, LightGBM, about two minutes.
+
+\input{tables/quality}
+
+\subsection{Exploratory analysis}
+The two countries look alike in structure. About 3--4\% of Source~2/3 records have no address, while Source~1
+addresses are always present (Table~\ref{tab:quality}). Devanagari appears only in Indian records: 23.5\% of
+Source~2 names and 13.2\% of Source~3 names. Fig.~\ref{fig:counts} shows the number of true matches per entity.
+The mode is three, 5.6\% of entities have no match at all, and the distributions of the two countries almost
+coincide. The mean is 3.45 and the variance 2.88, a first sign that a Poisson model, whose variance equals its
+mean, will not fit well. Fig.~\ref{fig:dist} contrasts three similarity features. Matches pile up near the
+maximum, but a fair share of non-matches also have identical names (the right-hand spike of the name cosine),
+because chain stores and common trade names repeat across cities. The address
+similarity separates the classes better, which the coefficients below confirm.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.75\linewidth]{fig_match_counts}
+\caption{Distribution of the number of true matches per Source~1 entity.}
+\label{fig:counts}
+\end{figure}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.72\textwidth]{fig_feature_dist}
+\caption{Densities of three pair features for matching and non-matching candidates (400k random pairs).}
+\label{fig:dist}
+\end{figure*}
+
+\subsection{Tuning}
+Table~\ref{tab:tuning} lists the selected settings. Logistic regression is flat across $C\ge0.1$
+(average precision 0.9973--0.9974) and class weighting did not help, so the default $C=1$ without weights was
+kept. LDA worked best without shrinkage, which is expected with 790k rows and 38 features. QDA needed
+regularisation ($0.1$): without it the per-class covariance of the matches is close to singular. The random
+search for LightGBM chose 85 leaves and a learning rate of 0.052, and early stopping on f4 ended the final fit
+after 541 trees. Cross-validation standard deviations are at most 0.001, so the ranking of the models is
+stable across folds.
+
+\input{tables/tuning}
+\input{tables/pairs}
+
+\subsection{Pair-level classification}
+All four models separate the classes well by AUC-ROC (Table~\ref{tab:pairs}), with values between 0.998 and 1.000.
+That number hides the differences that matter, because with 1.07 million negatives even a false positive rate of
+0.2\% means two thousand wrong links. The precision-recall view and Fig.~\ref{fig:roc} are more telling. LightGBM
+reaches an F1 of 0.989 and makes 797 false positives, against 2,011 for logistic regression, 2,303 for LDA and 2,412
+for QDA. Logistic regression is the best of the classical models on every metric (F1 0.979), and its log-loss of
+0.008 shows well calibrated probabilities. LDA has the lowest recall (0.925), since its single shared covariance
+cannot fit the very different spread of the two classes. QDA ranks pairs well but its probabilities are extreme: its
+F1-optimal threshold is 0.987 and its log-loss five times that of logistic regression.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.66\textwidth]{fig_roc_pr}
+\caption{ROC curves (log-scaled false positive rate) and precision-recall curves on the lockbox.}
+\label{fig:roc}
+\end{figure*}
+
+\subsection{What drives a match}
+The maximum likelihood fit on 250k training pairs reaches a McFadden pseudo-$R^2$ of 0.948. Fig.~\ref{fig:coef}
+plots the standardised coefficients. Three findings stand out. First, the strongest predictor is a context
+feature, \texttt{joint\_gap\_cand} ($\hat\beta=5.73$, $p<10^{-100}$): a record that resembles another Source~1
+entity better than the current one is unlikely to belong to the current one. Since each Source~2/3 record has a
+single owner, competition between entities carries more information than any single similarity. Second,
+address agreement outweighs name agreement. The address token-set ratio has an odds ratio of 45 per standard
+deviation and house-number overlap one of 25, while name TF-IDF cosine has 1.45 once the string metrics are present.
+Address cosine is only borderline ($p=0.015$) and the gap to the entity's best candidate is not significant
+($p=0.40$). Third, a Devanagari candidate is less likely to match at the same similarity level
+(odds ratio 0.67), which suggests that transliteration makes non-matching names look more alike than they are.
+The large positive coefficients of \texttt{num\_missing} and \texttt{c\_addr\_empty} should be read together with
+the features they flag: they offset the $-1$ code and the zero similarity that a missing value produces, and are not
+evidence that missing data indicates a match.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.8\linewidth]{fig_logit_coef}
+\caption{Logistic regression coefficients on standardised features with 95\% Wald intervals.}
+\label{fig:coef}
+\end{figure}
+
+\input{tables/entity}
+
+\subsection{Entity-level results}
+Table~\ref{tab:entity} reports the challenge metric. LightGBM with the expected-F0.5 rule scores 0.9855, within
+0.013 of the 0.9979 ceiling set by blocking. Logistic regression reaches 0.9716, QDA 0.9581 and LDA 0.9477. The
+decision rule matters in a model-dependent way. For the two calibrated models the expected-F0.5 rule is best:
+it adapts the number of accepted candidates to each entity and predicts nothing when no candidate is convincing.
+For logistic regression the F1 threshold (0.39) is even worse than 0.5, because it trades precision for recall
+while F0.5 rewards the opposite. For QDA the expected-F0.5 rule loses to the threshold, as the rule takes
+probabilities at face value and QDA's are badly calibrated. Indian entities score 0.1--2.3 points lower than US
+ones for every model, which matches the extra script and spelling noise seen in Table~\ref{tab:quality}.
+
+\subsection{Overfitting and underfitting}
+Fig.~\ref{fig:overfit} shows both failure modes. On the left, a deliberately flexible LightGBM (255 leaves, five
+samples per leaf) drives the training log-loss to $4\times10^{-8}$, while the validation log-loss reaches its minimum
+of 0.0054 at round 87 and then nearly doubles to 0.0102 by round 800. Early stopping and the tuned leaf size of 97
+avoid this. On the right, a single decision tree underfits at small depths (average precision 0.81 at depth one on both
+sets), peaks on validation at depth eight (0.988), and overfits beyond it: at depth 24 and above the tree reproduces
+the training data exactly while validation precision drops to 0.951.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.66\textwidth]{fig_overfit}
+\caption{Left: training and validation log-loss of an over-flexible LightGBM; the dashed line marks the validation
+minimum. Right: average precision of a decision tree against its maximum depth.}
+\label{fig:overfit}
+\end{figure*}
+
+\input{tables/counts}
+
+\subsection{Count models}
+The Poisson GLM finds sensible effects: the count rises with the number of candidates that agree strongly on both
+name and address ($\hat\gamma=0.60$ on the log scale) and with the best name similarity, and is about 10\% lower for
+Indian entities at equal evidence. Its fit, however, shows strong under-dispersion: the Pearson statistic divided
+by the residual degrees of freedom is 0.31, far below the value of one implied by the model. The negative binomial
+can only add variance, so its dispersion parameter collapses to $\hat\alpha\approx2\times10^{-8}$ and it reproduces
+the Poisson fit almost exactly (Table~\ref{tab:counts}). The source of under-dispersion is plain: most entities have
+two to five matches and few have none or many, so the counts are more regular than independent events would be.
+Treating the count as a category works better. The multinomial logit over $\{0,1,2,3{+}\}$ classifies 80.8\% of
+the lockbox entities correctly, against 76.3\% for the rounded Poisson mean on the same classes.
+
+Used as a decision rule, the count model falls well short. Accepting the top $\operatorname{round}(\hat\mu)$
+LightGBM candidates gives a macro F0.5 of only 0.860, against 0.9855 for the expected-F0.5 rule. A mean absolute
+count error of 0.71 is small for a regression, but every unit of error is a missed or wrong link. The pair
+probabilities already contain sharper information about each entity than eight summary statistics do.
+
+\input{tables/challenge}
+
+\subsection{The full challenge system}
+Table~\ref{tab:challenge} traces our challenge entry on the full data, where each entity competes with 20 times
+more look-alikes. The largest gains came from blocking, not from the classifier: union blocking and transliteration
+raised the recall ceiling from 0.888 to 0.935, and a name-word TF-IDF view raised it to 0.973, lifting the dev score
+from 0.936 to 0.974 and the public leaderboard score from 0.902 to 0.959. Training the second stage on more data
+(r003) did not help. The two-stage design keeps the candidate file small (5.1 candidates per entity), which the
+challenge rewarded separately.
+
+\section{Discussion}
+The comparison gives a clear order: gradient boosting first, then logistic regression, QDA and LDA. Logistic
+regression is the practical runner-up. It is 1.4 points behind LightGBM on the challenge metric, trains in eleven
+seconds instead of two minutes, and every coefficient can be read and tested. In a setting where links must be
+explained to a reviewer or an auditor, that trade may be worth making. The discriminant models suffer from the
+Gaussian assumption. Similarity scores are bounded and pile up at their maximum (Fig.~\ref{fig:dist}), which is
+far from normal, so LDA and QDA lose recall and calibration respectively.
+
+Two lessons carry beyond this data. First, a metric that averages over entities must be optimised over entities:
+a fixed pair threshold, even one tuned for F1, leaves score on the table, while the expected-F0.5 rule needs only
+calibrated probabilities. Second, checking the dispersion of a count before choosing between Poisson and negative
+binomial is not a formality. Here the usual remedy for a poor Poisson fit, the negative binomial, cannot help,
+because the problem is too little variance rather than too much.
+
+\input{sections/discussion}
+
+\section{Conclusion}
+We treated business entity resolution as a predictive modeling problem: TF-IDF blocking, 43 engineered pair
+features, four classifiers tuned with grouped cross-validation, an entity-level decision rule and count models for
+the number of matches. On a held-out lockbox of 21,685 entities, LightGBM reached a macro F0.5 of 0.9855 and logistic
+regression 0.9716, against a ceiling of 0.9979. The logistic coefficients show that address and house-number
+agreement and the competition between entities for a record matter more than name similarity. The match counts are
+under-dispersed, so the negative binomial model reduces to Poisson and a multinomial logit fits better, but no count
+model beats the expected-F0.5 rule as a way to choose matches. The full version of the pipeline reached 0.959 on the
+Amazon ML Challenge 2026 public leaderboard. Future work includes testing transfer to unseen countries such as
+France, ordinal or generalised Poisson models for under-dispersed counts, and calibrating QDA before using it in the
+expected-F rule.

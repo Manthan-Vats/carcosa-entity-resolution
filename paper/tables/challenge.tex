@@ -1,0 +1,16 @@
+\begin{table*}[t]
+\centering
+\footnotesize
+\caption{Development of the full challenge system (all 1.76M dev entities, scored on fold f0)}
+\label{tab:challenge}
+\begin{tabular}{llrrrr}
+\toprule
+Run & Change & Dev F0.5 & Recall cap & Cands/S1 & Public LB \\
+\midrule
+r001 & TF-IDF top-15, LightGBM prune + pair model & 0.9364 & 0.8881 & 4.27 & 0.902 \\
+r002 & union blocking, transliteration, sibling features & 0.9546 & 0.9346 & 5.59 & 0.927 \\
+r003 & r002 with stage B on more data & 0.9535 & 0.9346 & 5.59 & -- \\
+r004 & name-word view, cross-fitted stage A & 0.9742 & 0.9732 & 5.14 & 0.959 \\
+\bottomrule
+\end{tabular}
+\end{table*}

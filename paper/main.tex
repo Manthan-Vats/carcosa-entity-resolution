@@ -1,0 +1,62 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage[hidelinks]{hyperref}
+\graphicspath{{figures/}}
+
+\begin{document}
+
+\title{Predicting Cross-Source Matches of Noisy Business Records: Logistic, Discriminant and Count Models for Entity Resolution}
+
+\author{
+\IEEEauthorblockN{Manthan Vats}
+\IEEEauthorblockA{Reg. No. 2427030314\\
+Department of Computer Science and Engineering\\
+UNIVERSITY NAME, CITY, India\\
+EMAIL}
+\and
+\IEEEauthorblockN{Peddi Reddy Srikar Reddy}
+\IEEEauthorblockA{Reg. No. 2427030741\\
+Department of Computer Science and Engineering\\
+UNIVERSITY NAME, CITY, India\\
+EMAIL}
+}
+
+\maketitle
+
+\begin{abstract}
+Records of the same business often sit in several databases under different spellings, abbreviations and scripts,
+with no shared identifier. We treat this entity resolution task as a predictive modeling problem on the Amazon ML
+Challenge 2026 data, which links US and Indian business records across three sources. TF-IDF blocking reduces each
+query to about 50 candidates, and every candidate pair is described by 43 engineered features. On a 5\% stratified
+sample we compare logistic regression, linear and quadratic discriminant analysis and gradient boosting (LightGBM),
+tuned by grid and random search under five-fold grouped cross-validation and tested on a lockbox of 21,685 entities.
+LightGBM reaches a macro F0.5 of 0.9855 and logistic regression 0.9716, while LDA and QDA trail at 0.948 and 0.958.
+The logistic coefficients show that address and house-number agreement, together with competition between entities
+for the same record, predict a match better than name similarity. An expected-F0.5 decision rule beats fixed
+probability thresholds for calibrated models. We also model the number of matches per entity: the counts are
+under-dispersed (Pearson dispersion 0.31), so the negative binomial model collapses to the Poisson model, and a
+multinomial logit classifies the counts more accurately. The full version of the pipeline scored 0.959 on the challenge
+public leaderboard.
+\end{abstract}
+
+\begin{IEEEkeywords}
+entity resolution, record linkage, logistic regression, discriminant analysis, gradient boosting, count regression, F-measure
+\end{IEEEkeywords}
+
+\input{sections/intro_method}
+\input{sections/results}
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+
+\end{document}

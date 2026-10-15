@@ -1,0 +1,16 @@
+\begin{table*}[t]
+\centering
+\footnotesize
+\caption{Pair-level results on the lockbox (1.14M pairs, F1 threshold chosen on f4)}
+\label{tab:pairs}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Model & AUC-ROC & PR-AUC & F1 & Prec. & Rec. & Log-loss & Brier \\
+\midrule
+LR & 0.9998 & 0.9972 & 0.9786 & 0.9733 & 0.9840 & 0.0081 & 0.0022 \\
+LDA & 0.9983 & 0.9845 & 0.9460 & 0.9676 & 0.9253 & 0.0760 & 0.0066 \\
+QDA & 0.9987 & 0.9884 & 0.9690 & 0.9677 & 0.9704 & 0.0386 & 0.0042 \\
+LightGBM & \textbf{1.0000} & \textbf{0.9993} & \textbf{0.9885} & \textbf{0.9893} & \textbf{0.9878} & \textbf{0.0041} & \textbf{0.0011} \\
+\bottomrule
+\end{tabular}
+\end{table*}

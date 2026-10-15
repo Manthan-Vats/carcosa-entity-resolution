@@ -1,0 +1,184 @@
+\section{Introduction}
+Marketplaces, banks and logistics firms keep records of the same businesses in several systems, and those
+systems rarely share an identifier. One source lists ``Sharma Traders Pvt Ltd, Plot 14, MG Road, Pune'', a second
+writes ``Sharma Traders Private Limited, 14 Mahatma Gandhi Rd'' and a third gives the name in Devanagari with
+no PIN code. Deciding which records belong to the same real business is called entity resolution (ER) or
+record linkage~\cite{fellegi1969,christen2012}. Mistakes are expensive in both directions: a missed link splits
+one seller into two accounts, while a false link merges the payment history of two unrelated companies.
+
+We study ER as a predictive modeling problem. For each record of a reference source (Source~1) we must predict the
+set of records in two other sources that describe the same business. The data is the training set of the Amazon
+ML Challenge 2026 business entity resolution task: 2.2 million Source~1 records from the US and India,
+10.3 million Source~2/3 records and 7.6 million labelled matches. Our team took part in the challenge with a
+two-stage gradient boosting system that reached a public leaderboard score of 0.959 (macro F0.5).
+For this paper we return to the problem with the tools of a predictive analytics course and ask three questions.
+How far do interpretable classifiers (logistic regression, linear and quadratic discriminant analysis) get
+compared with gradient boosting on the same features? Which evidence drives a match, as measured by the estimated
+logistic regression coefficients? And can a count model for the number of matches per entity (Poisson, negative
+binomial, multinomial logit) support the decision of how many candidates to accept?
+
+The contributions are: (i) a reproducible pipeline that turns the raw records into 43 pair features after
+TF-IDF blocking; (ii) a comparison of four classifiers with grouped cross-validation, grid search and random
+search, scored on a lockbox split that was never touched while building the challenge system; (iii) an
+analysis of decision rules that convert pair probabilities into match sets, including an expected-F0.5 rule;
+and (iv) a count-data view of the problem, which shows that match counts in this data are under-dispersed.
+All code, the executed notebook, the result tables and a dashboard are in our GitHub repository\footnote{\url{https://github.com/Manthan-Vats/carcosa-entity-resolution}. The challenge data belongs to the organisers; the repository holds only a 1,500-entity demo sample for the dashboard.}.
+
+\section{Related Work}
+The probabilistic basis of record linkage goes back to Fellegi and Sunter~\cite{fellegi1969}, who scored record pairs
+by likelihood ratios of field agreement and accepted pairs above a threshold. Surveys by Elmagarmid
+et al.~\cite{elmagarmid2007} and Christen~\cite{christen2012} describe the now standard steps: normalisation,
+blocking, pair comparison, classification and evaluation. Blocking limits the quadratic number of comparisons;
+Papadakis et al.~\cite{papadakis2020} review the main families, of which token and q-gram based similarity search
+is closest to our TF-IDF approach~\cite{salton1988}.
+
+Pair comparison relies on string similarity. Cohen et al.~\cite{cohen2003} compared edit-based and token-based
+metrics for names and found hybrid token measures strongest, while the Jaro-Winkler metric~\cite{winkler1990}
+remains common for short names. Bilenko and Mooney~\cite{bilenko2003} showed that learning how to combine
+similarities with a classifier beats hand-tuned rules. Magellan~\cite{konda2016} packaged this
+features-plus-classifier recipe, where random forests and logistic regression are typical choices. Deep models
+followed: DeepMatcher~\cite{mudgal2018} and Ditto~\cite{li2020ditto} embed both records with neural or
+pre-trained language models and gain most on textual, dirty data. They need GPUs and their decisions are harder to
+explain, so we keep to feature-based models, where gradient boosted trees~\cite{friedman2001,ke2017} are the strongest
+standard learner and logistic regression~\cite{hosmer2013} offers direct inference on each piece of evidence.
+
+The challenge metric is an F-measure averaged over entities, so the decision step matters as much as the
+probabilities. Lipton et al.~\cite{lipton2014} showed that the F1-optimal threshold of a calibrated classifier is
+half the optimal F1 score, and Jansche~\cite{jansche2005} trained models directly for expected F-measure.
+We use the expected-F idea per entity rather than one global threshold.
+
+\section{Data and Preparation}
+\subsection{Records and labels}
+Each record has an identifier, a business name, an address and a country label. Source~1 is deduplicated; every
+Source~2/3 record matches at most one Source~1 entity, and a Source~1 entity can match zero, one or many records.
+The noise is typical of commercial data: legal suffix variants (Pvt/Private, Corp/Corporation), word order changes,
+typos, DBA names, landmark addresses (``near SBI ATM''), missing PIN codes and, for India, names written in
+Devanagari. Table~\ref{tab:quality} summarises missing addresses and non-Latin names in our sample.
+
+\subsection{Normalisation}
+Names and addresses are lower-cased, ``\&'' becomes ``and'', and text in Indic scripts is mapped to Latin with a token
+dictionary learned from matched training pairs (1,339 name tokens), backed by a generic transliteration library
+(\texttt{anyascii}) for unseen tokens. House and plot numbers are extracted into a separate field, and their
+leading zeros are stripped (``00604'' $\rightarrow$ ``604''). Missing values are not imputed: an empty address
+stays empty and is exposed to the models as a binary feature, and number features take the value $-1$ when either
+record has no number, together with an explicit missing-number indicator. No outliers were removed. Unusually long
+names (the 99th percentile is about 50 characters) are real records, and the length features capture them.
+
+\subsection{Study sample and splits}
+Running the full pipeline on all records takes several hours, so the comparative study uses a 5\% sample: 5\%
+of the Source~1 entities, all their true matches, and 5\% of the Source~2/3 records that match nobody. Because
+each Source~2/3 record belongs to at most one entity, the sample keeps the ratio of matched to unmatched records
+(4.7 pool records per entity in both). The sample has 110,341 entities and 625,153 records in total.
+
+The split unit is the Source~1 entity, so all candidate pairs of an entity fall in the same split. We reuse the
+fold assignment of our challenge system: five development folds f0--f4 (16\% of entities each), stratified by
+country and number of matches, and a 20\% lockbox. Folds f1--f3 train the final models, f4 serves for early
+stopping and threshold choice, f0--f4 together form the five groups of the cross-validation used for tuning, and
+the lockbox is the test set.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[node distance=0.2cm, every node/.style={font=\footnotesize},
+  box/.style={draw, rounded corners=2pt, align=center, minimum width=7.6cm, minimum height=0.5cm, inner sep=2pt, fill=gray!6},
+  arr/.style={-{Stealth[length=2mm]}, thick}]
+\node[box] (n) {\textbf{Normalisation}: lower-case, transliteration, house numbers};
+\node[box, below=of n] (b) {\textbf{Blocking}: TF-IDF cosine top-$k$ (name, address, number views)};
+\node[box, below=of b] (f) {\textbf{Pair features} (43): similarities, context, string metrics};
+\node[box, below=of f] (c) {\textbf{Classifier}: LR / LDA / QDA / LightGBM $\rightarrow P(\text{match})$};
+\node[box, below=of c] (d) {\textbf{Decision}: expected-F0.5 top-$k$ per entity};
+\node[box, below=of d, fill=blue!5] (k) {\textbf{Count model}: Poisson / NB / multinomial logit for $|M(e)|$};
+\draw[arr] (n) -- (b); \draw[arr] (b) -- (f); \draw[arr] (f) -- (c); \draw[arr] (c) -- (d);
+\draw[arr, dashed] (k.east) -- ++(0.35,0) |- (d.east);
+\end{tikzpicture}
+\caption{Pipeline of the study. The count model is an alternative way to choose how many candidates to accept.}
+\label{fig:pipeline}
+\end{figure}
+
+\section{Methodology}
+\subsection{Blocking}
+Comparing every Source~1 record with every pool record of the same country would mean about $10^{12}$ pairs on
+the full data. Blocking keeps a short candidate list per entity. We build L2-normalised TF-IDF
+vectors~\cite{salton1988} for four views: name character 3-grams (robust to typos), name words, address words and
+house numbers. Very common terms are removed through a maximum document frequency (0.5\% for character
+grams, 3\% for name words). For a weighted combination of views $v$ with weights $w_v$, the joint score of a
+query $q$ and a pool record $r$ is
+\begin{equation}
+s(q,r)=\sum_{v} w_v \cos\!\big(\mathbf{x}^{(v)}_q,\mathbf{x}^{(v)}_r\big).
+\end{equation}
+Four searches with different weights (address-heavy, name-heavy, number-aware, and name-only among records without
+an address) return their top 10--30 records, and the union forms the candidate set. Sparse top-$k$ matrix products
+make this fast enough for a laptop CPU.
+
+\subsection{Pair features}
+Every candidate pair gets 43 features in four groups. \emph{Blocking similarities}: the four view cosines, the
+joint score and the rank of the candidate in each search. \emph{Context}: the gap between a candidate's score and
+the best score of the same entity, the gap to the best entity for the same candidate, ranks, and the number of
+candidates per entity and per pool record. These features let a pointwise classifier see the competition among
+candidates. \emph{String similarity}: Levenshtein ratio, token-sort and token-set ratios, partial ratio and
+Jaro-Winkler on names~\cite{cohen2003,winkler1990}; token-set, token-sort and partial ratio on addresses; Jaccard
+overlap and first-number agreement of house numbers. \emph{Record properties}: name and address lengths
+(log-transformed), empty address, Devanagari script and candidate source.
+
+For the linear and discriminant models we drop one feature of each pair with absolute Pearson correlation above 0.95
+on the training folds, which removes redundant copies such as the joint score and its rank. Gradient boosting uses
+all features.
+
+\subsection{Classifiers}
+\emph{Logistic regression} models the match probability of pair $i$ with feature vector $\mathbf{x}_i$ as
+\begin{equation}
+P(y_i=1\mid\mathbf{x}_i)=\sigma(\beta_0+\boldsymbol{\beta}^{\top}\mathbf{x}_i),\quad \sigma(z)=\frac{1}{1+e^{-z}},
+\end{equation}
+and the coefficients maximise the penalised log-likelihood
+\begin{equation}
+\ell(\boldsymbol\beta)=\sum_i\big[y_i\log p_i+(1-y_i)\log(1-p_i)\big]-\frac{1}{2C}\lVert\boldsymbol\beta\rVert_2^2 .
+\end{equation}
+For inference we refit an unpenalised model by maximum likelihood (Newton-Raphson) on standardised inputs, so that
+$e^{\beta_j}$ is the odds ratio for a one standard deviation increase in feature $j$, and Wald $z$-tests give
+standard errors and $p$-values~\cite{hosmer2013}.
+
+\emph{Linear discriminant analysis} assumes Gaussian class densities with a shared covariance $\Sigma$ and classifies by
+\begin{equation}
+\delta_k(\mathbf{x})=\mathbf{x}^{\top}\Sigma^{-1}\boldsymbol\mu_k-\tfrac12\boldsymbol\mu_k^{\top}\Sigma^{-1}\boldsymbol\mu_k+\log\pi_k ,
+\end{equation}
+which gives a linear boundary~\cite{fisher1936,hastie2009}. We tune Ledoit-Wolf style shrinkage of
+$\Sigma$~\cite{ledoit2004}. \emph{Quadratic discriminant analysis} allows a covariance $\Sigma_k$ per class, which
+adds the term $-\tfrac12\log|\Sigma_k|$ and makes the boundary quadratic; its regularisation parameter shrinks
+each $\Sigma_k$ towards the identity. \emph{LightGBM}~\cite{ke2017} fits an additive model of regression trees by
+gradient boosting on the log-loss~\cite{friedman2001} and serves as the non-linear reference, since it is the model
+of our challenge system.
+
+\subsection{From probabilities to match sets}
+The challenge score of entity $e$ with predicted set $\hat M$ and true set $M$ is
+\begin{equation}
+F_{0.5}(e)=\frac{(1+\beta^2)\,PR}{\beta^2P+R},\quad \beta=0.5,
+\end{equation}
+with precision $P=|\hat M\cap M|/|\hat M|$ and recall $R=|\hat M\cap M|/|M|$. An entity without matches scores 1
+only when nothing is predicted, and the final score is the mean over entities. $\beta=0.5$ weighs precision twice
+as much as recall. We compare three rules: a fixed threshold of 0.5; the threshold that maximises pair-level F1 on
+f4; and an \emph{expected-F0.5 top-$k$} rule. With candidate probabilities sorted as $p_1\ge p_2\ge\dots$, the
+rule picks
+\begin{equation}
+k^{*}=\arg\max_{k\ge 1}\frac{1.25\sum_{j\le k}p_j}{k+0.25\sum_j p_j},
+\end{equation}
+a ratio-of-expectations approximation of the expected F0.5, and predicts the empty set instead when
+$\prod_j(1-p_j)$, the probability that the entity has no match among its candidates, is larger.
+
+\subsection{Count models}
+Let $N_e=|M(e)|$ be the number of true matches of entity $e$. From eight entity-level summaries of the candidate
+list (counts of strong name and address agreements, the best joint and name scores, record lengths and country) we
+fit a Poisson GLM with log link, $\log \mathbb{E}[N_e]=\mathbf{z}_e^{\top}\boldsymbol\gamma$, and a negative
+binomial (NB2) model with $\operatorname{Var}(N_e)=\mu_e+\alpha\mu_e^2$, which relaxes the Poisson assumption
+that the variance equals the mean~\cite{cameron2013}. A multinomial logit over the classes $\{0,1,2,3{+}\}$ treats
+the count as a category. The predicted mean also gives a decision rule: accept the $\operatorname{round}(\hat\mu_e)$
+highest-ranked candidates.
+
+\subsection{Validation and tuning}
+Hyperparameters are tuned by five-fold grouped cross-validation~\cite{kohavi1995} on 15,000 development entities
+(about 790k pairs), with the predefined folds as groups so that no entity is split. Grid search covers the
+logistic regression penalty $C\in\{10^{-3},\dots,10\}$ with and without class weighting, LDA shrinkage, and the QDA
+regularisation parameter. For LightGBM, random search~\cite{bergstra2012} draws 12 settings of the number of leaves,
+learning rate, minimum leaf size, row and column subsampling and L2 penalty. The tuning score is average precision,
+because only about 6.5\% of the pairs are matches and accuracy or ROC-AUC alone would hide differences in
+precision~\cite{saito2015}. Pair-level results are reported as AUC-ROC, PR-AUC, F1, precision, recall, log-loss and
+Brier score; count models as MAE and RMSE. All models use scikit-learn~\cite{pedregosa2011},
+statsmodels~\cite{seabold2010} and LightGBM.

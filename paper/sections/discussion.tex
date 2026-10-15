@@ -1,0 +1,19 @@
+\subsection{Ethical considerations}
+Business records are less sensitive than personal data, but ER systems in practice also link sole proprietors,
+whose business name is often a person's name and whose address is a home. A false merge can attach one trader's
+complaints or credit history to another, and the harm falls on the smaller party, who may not know the link
+exists. For that reason we favour a precision-weighted metric, keep the model's evidence inspectable through the
+logistic regression coefficients and the dashboard, and recommend human review for low-confidence links before they
+change any account. The model performs slightly worse on Indian records, which carry more script and spelling
+variation; a deployed system should monitor error rates per country and script so that one group of businesses
+does not bear most of the mistakes. The challenge data is used only for this academic study; apart from a small demo
+sample for the dashboard, it is not redistributed.
+
+\subsection{Limitations}
+The study sample keeps the ratio of matched to unmatched records but has 20 times fewer records per country, so
+each entity faces fewer look-alike competitors. Blocking recall is therefore higher (99.4\%) than on the full data
+(97.8\%), and absolute scores are optimistic compared with the full challenge setting. The comparison between
+models is still fair, because all of them see the same candidates and features. The test countries of the
+challenge include France, which is absent from training; the lockbox only contains US and Indian records, so our
+results say nothing direct about transfer to a new country. Time series methods from the syllabus do not apply,
+since the records carry no timestamps.
