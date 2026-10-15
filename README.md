@@ -9,6 +9,16 @@ For every Source 1 record we predict which Source 2/3 records describe the same 
 The data comes from the Amazon ML Challenge 2026 (Business Entity Resolution), in which this
 repository was our team's entry (public leaderboard macro F0.5 = 0.959).
 
+## Quick links
+
+| What | Link |
+|---|---|
+| Research paper (IEEE, 7 pages) | [`paper/main.pdf`](paper/main.pdf) |
+| Notebook with all outputs | [`notebooks/predictive_modeling.ipynb`](notebooks/predictive_modeling.ipynb) |
+| Live dashboard | DASHBOARD_LINK |
+| Dashboard source | [`app/app.py`](app/app.py) |
+| Result tables | [`reports/`](reports/) |
+
 The course study recasts the problem as a set of predictive models from the syllabus:
 
 | Syllabus topic | Where |
