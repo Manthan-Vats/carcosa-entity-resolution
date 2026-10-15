@@ -1,0 +1,11 @@
+params,mean_test_score,std_test_score
+"{'logisticregression__C': 0.001, 'logisticregression__class_weight': None}",0.995349150082177,0.00014909803349801186
+"{'logisticregression__C': 0.001, 'logisticregression__class_weight': 'balanced'}",0.9959946151482002,9.433518772547903e-05
+"{'logisticregression__C': 0.01, 'logisticregression__class_weight': None}",0.9968765202616785,5.583743168006543e-05
+"{'logisticregression__C': 0.01, 'logisticregression__class_weight': 'balanced'}",0.9970368363880517,9.199705908784887e-05
+"{'logisticregression__C': 0.1, 'logisticregression__class_weight': None}",0.9973757917183367,0.00010197944776289066
+"{'logisticregression__C': 0.1, 'logisticregression__class_weight': 'balanced'}",0.9972881704997849,0.00011491997048560522
+"{'logisticregression__C': 1, 'logisticregression__class_weight': None}",0.997421415282326,0.00012990046607301488
+"{'logisticregression__C': 1, 'logisticregression__class_weight': 'balanced'}",0.9972933928843478,0.00012137317466797524
+"{'logisticregression__C': 10, 'logisticregression__class_weight': None}",0.99739819624877,0.00011024031954392291
+"{'logisticregression__C': 10, 'logisticregression__class_weight': 'balanced'}",0.9972943275410762,0.00012230234948388318
