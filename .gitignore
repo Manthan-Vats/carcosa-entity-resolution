@@ -9,3 +9,13 @@ __pycache__/
 models_smoke/
 logs/
 /package/
+
+# course study
+data/study/
+!app/*.parquet
+!app/models/
+paper/*.aux
+paper/*.log
+paper/*.bbl
+paper/*.blg
+paper/*.out
